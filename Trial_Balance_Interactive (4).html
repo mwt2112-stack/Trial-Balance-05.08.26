@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Columbia University – Trial Balance by Account Detail (Training)</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root { --columbia: #003087; --hover: #fff3cd; --active: #d0e8ff; --outline: #0056b3; }
+
+/* Zoom via transform on a wrapper so 100vh stays anchored to real viewport */
+html, body { width: 100%; height: 100%; margin: 0; padding: 0; overflow: hidden; }
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 10px; color: #111;
+  background: #e8e8e8;
+}
+
+/* Scale wrapper — zooms content but keeps viewport dimensions intact */
+#zoom-wrapper {
+  transform: scale(1.5);
+  transform-origin: top left;
+  width: calc(100% / 1.5);
+  height: calc(100% / 1.5);
+  display: flex;
+  flex-direction: row;
+}
+
+#report-panel {
+  flex: 1 1 auto; background: #fff; min-width: 0;
+  display: flex; flex-direction: column;
+  height: 100%; overflow: hidden;
+}
+#report-static { flex-shrink: 0; background: #fff; z-index: 10; }
+#table-scroll-area {
+  flex: 1 1 auto;
+  overflow-x: scroll;
+  overflow-y: auto;
+  position: relative;
+}
+/* Always-visible scrollbar */
+#table-scroll-area::-webkit-scrollbar { height: 14px; width: 14px; }
+#table-scroll-area::-webkit-scrollbar-track { background: #d4d4d4; border-top: 1px solid #aaa; }
+#table-scroll-area::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; border: 2px solid #d4d4d4; }
+#table-scroll-area::-webkit-scrollbar-thumb:hover { background: #555; }
+#table-scroll-area::-webkit-scrollbar-corner { background: #d4d4d4; }
+#table-scroll-area { scrollbar-width: auto; scrollbar-color: #888 #d4d4d4; }
+
+/* NAV */
+.nav-bar { background:#fff; border-bottom:1px solid #ccc; padding:2px 10px 0; display:flex; justify-content:space-between; align-items:center; }
+.nav-bar a { color:#00419e; text-decoration:none; font-size:10px; font-weight:bold; white-space:nowrap; }
+.nav-bar a:hover { text-decoration:underline; }
+
+/* HEADER */
+.header-top { display:flex; align-items:flex-start; padding:4px 10px 2px; }
+.logo-area { display:flex; align-items:center; gap:4px; min-width:155px; flex-shrink:0; }
+.logo-crown { font-size:15px; color:var(--columbia); }
+.logo-text .cu-name { font-size:9px; font-weight:bold; color:var(--columbia); text-transform:uppercase; letter-spacing:.3px; line-height:1.2; }
+.logo-text .cu-sub  { font-size:6px; color:var(--columbia); text-transform:uppercase; }
+.center-titles { flex:1; text-align:center; line-height:1.4; }
+.center-titles .fds { font-size:9px; color:#333; font-style:italic; }
+.center-titles .t1  { font-size:12px; font-weight:bold; }
+.center-titles .t2  { font-size:11px; font-weight:bold; }
+.center-titles .t3  { font-size:10px; }
+.run-block { font-size:9.5px; text-align:right; white-space:nowrap; line-height:1.65; }
+.run-block b { font-weight:bold; }
+
+/* META */
+.meta-block { padding:3px 10px 4px; font-size:9.5px; line-height:1.55; border-bottom:1px solid #999; }
+.meta-block b { font-weight:bold; }
+
+/* PILL BAR */
+.pill-bar-wrap {
+  padding:4px 10px 3px; border-bottom:1px solid #ddd; border-top:1px solid #eee;
+  background:#fafafa; display:flex; align-items:center; gap:8px; flex-shrink:0;
+}
+.pill-bar-label { font-size:8px; font-weight:600; text-transform:uppercase; letter-spacing:.1em; color:#999; white-space:nowrap; }
+.pill {
+  display:inline-flex; align-items:center; gap:4px;
+  padding:2px 10px 2px 7px; border-radius:100px;
+  border:1.5px solid #bbb; background:#fff;
+  font-size:9px; font-weight:bold; cursor:pointer;
+  transition:all .15s; user-select:none; color:#444; white-space:nowrap;
+}
+.pill-dot { width:6px; height:6px; border-radius:50%; flex-shrink:0; }
+.pill:hover { border-color:#555; color:#111; }
+
+.pill[data-pill="who"] .pill-dot     { background:#0e7490; }
+.pill[data-pill="who"].pill-on       { background:#d0f0f8; border-color:#0e7490; color:#0a5c6e; }
+.pill[data-pill="chartfield"] .pill-dot { background:#6f9fd6; }
+.pill[data-pill="chartfield"].pill-on { background:#edf4ff; border-color:#6f9fd6; color:#335c8a; }
+.pill[data-pill="payment"] .pill-dot { background:#c97b00; }
+.pill[data-pill="payment"].pill-on   { background:#fff3d6; border-color:#8a4b00; color:#8a4b00; }
+.pill[data-pill="amount"] .pill-dot  { background:#2a8a2a; }
+.pill[data-pill="amount"].pill-on    { background:#dff5df; border-color:#1a5c1a; color:#1a5c1a; }
+.pill[data-pill="overview"] .pill-dot { background:#7c8aa5; }
+.pill[data-pill="overview"].pill-on { background:#eef2f8; border-color:#9aa7bd; color:#46556f; }
+.pill[data-pill="walkthrough"] .pill-dot { background:#4f8fd6; }
+.pill[data-pill="walkthrough"].pill-on { background:#eaf3ff; border-color:#8cb4e3; color:#003087; }
+
+/* S4 HIGHLIGHT ENGINE */
+@keyframes hlShimmer  { 0%{background-position:-200% center,0 0} 100%{background-position:300% center,0 0} }
+@keyframes hlBeat     { 0%,100%{filter:brightness(1)} 45%{filter:brightness(1.28)} }
+@keyframes hlIn       { from{opacity:0;transform:translateX(4px)} to{opacity:1;transform:translateX(0)} }
+@keyframes glowBreathe{ 0%,100%{opacity:.45} 50%{opacity:1} }
+th.hl-hdr {
+  position:relative !important; overflow:hidden !important;
+  background-image:linear-gradient(105deg,rgba(255,255,255,0) 20%,rgba(255,255,255,.28) 50%,rgba(255,255,255,0) 80%),linear-gradient(var(--hl-fill),var(--hl-fill)) !important;
+  background-size:200% 100%,100% 100% !important; background-position:-200% center,0 0 !important;
+  animation:hlShimmer 3.2s ease-in-out infinite !important;
+  border-left:1px solid var(--hl-line) !important; border-right:1px solid var(--hl-line) !important;
+  border-top:1.5px solid var(--hl-line) !important; border-bottom:2px solid var(--hl-strong) !important;
+  color:var(--hl-text) !important;
+}
+
+td.hl-cell {
+  background:var(--hl-cell) !important;
+  border-left:1px solid var(--hl-soft) !important;
+  border-right:1px solid var(--hl-soft) !important;
+  color:#111 !important;
+}
+
+
+/* TABLE */
+.table-wrapper { padding:0 4px 10px; position:relative; min-width:max-content; }
+table.tbal { border-collapse:collapse; font-size:7.5px; white-space:nowrap; }
+.tbal thead { position:sticky; top:0; z-index:4; }
+.tbal thead th {
+  background:#fff; text-align:center; font-weight:bold; font-size:7px;
+  padding:1px 2px; border-top:1px solid #888; border-bottom:2px solid #888;
+  vertical-align:bottom; line-height:1.2; white-space:normal; min-width:36px; cursor:pointer;
+  transition:background .12s;
+}
+.tbal thead th:hover { background:#fff3cd; outline:1px solid #e6a817; }
+.tbal thead th.active { background:#d0e8ff; outline:1px solid #0056b3; }
+.tbal thead th.lft { text-align:left; }
+.tbal tbody td { padding:1px 2px; vertical-align:top; font-size:7.5px; text-align:left; white-space:nowrap; }
+.tbal tbody td.r { text-align:right; }
+.tbal tbody td.neg { text-align:right; color:#000; }
+.tbal tbody tr:hover td { background:#f5f5f5; }
+tr.grand-total td { font-weight:bold; border-top:2px solid #333; border-bottom:3px double #111; text-align:right; padding:1px 2px; }
+tr.grand-total td.lbl { text-align:left; }
+
+/* EXPLAIN PANEL */
+#explain-panel { width:0; min-width:0; overflow:hidden; background:#fafafa; border-left:3px solid #003087; transition:width .28s ease,min-width .28s ease; display:flex; flex-direction:column; flex-shrink:0; height:100%; }
+#explain-panel.open { width:360px; min-width:340px; }
+.panel-header { background:#003087; color:#fff; padding:6px 10px; font-size:10px; font-weight:bold; display:flex; justify-content:space-between; align-items:center; min-width:340px; flex-shrink:0; }
+.panel-header button { background:none; border:none; color:#fff; cursor:pointer; font-size:13px; }
+.panel-header button:hover { opacity:.7; }
+.panel-tab-hint { font-size:8px; font-weight:normal; opacity:.8; margin-left:8px; white-space:nowrap; }
+#explain-inner { padding:10px; overflow-y:auto; flex:1; min-width:340px; }
+.explain-field-name { font-size:13px; font-weight:bold; color:#003087; margin-bottom:7px; border-bottom:1px solid #ccd; padding-bottom:4px; }
+.explain-section { margin-bottom:8px; }
+.tip-badge { display:inline-block; background:#003087; color:#fff; font-size:8px; font-weight:bold; padding:1px 5px; border-radius:2px; margin-bottom:2px; letter-spacing:.3px; }
+.explain-section-body { font-size:10.5px; color:#222; line-height:1.55; }
+/* Glossary tables inside panel */
+.glossary-title { font-size:9px; font-weight:bold; text-transform:uppercase; letter-spacing:.08em; color:#003087; margin:10px 0 4px; border-top:1px solid #dde; padding-top:8px; }
+.glossary-table { width:100%; border-collapse:collapse; font-size:9px; margin-bottom:4px; }
+.glossary-table th { background:#003087; color:#fff; padding:2px 4px; text-align:left; font-size:8.5px; font-weight:bold; white-space:nowrap; }
+.glossary-table td { padding:2px 4px; border-bottom:1px solid #eee; vertical-align:top; line-height:1.4; }
+.glossary-table tr:nth-child(even) td { background:#f5f7fc; }
+.glossary-table td:first-child { font-weight:bold; color:#003087; white-space:nowrap; min-width:30px; }
+.glossary-table td:nth-child(2) { color:#333; min-width:90px; }
+.glossary-table td:nth-child(3) { color:#555; }
+.dept-hierarchy-wrap { margin-top:10px; border:1px solid #d8deea; border-radius:12px; background:#f8fafe; padding:10px; }
+.dept-hierarchy-head { font-size:11px; font-weight:bold; color:#003087; margin-bottom:4px; }
+.dept-hierarchy-sub { font-size:9px; color:#556; line-height:1.5; margin-bottom:10px; }
+.dept-tier-grid { display:grid; grid-template-columns:1fr; gap:8px; margin-bottom:10px; }
+.dept-tier-card { border:1px solid #d8deea; border-radius:10px; background:#fff; padding:8px 9px; }
+.dept-tier-title { font-size:9px; font-weight:bold; color:#003087; text-transform:uppercase; letter-spacing:.06em; margin-bottom:2px; }
+.dept-tier-pattern { font-size:10px; font-weight:bold; color:#111; margin-bottom:2px; }
+.dept-tier-text { font-size:9px; color:#444; line-height:1.45; }
+.dept-example-title { font-size:9px; font-weight:bold; text-transform:uppercase; letter-spacing:.06em; color:#003087; margin:8px 0 4px; }
+.dept-chip-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; }
+.dept-chip { border:1px solid #d8deea; background:#fff; border-radius:10px; padding:7px 8px; font-size:9px; line-height:1.35; color:#333; }
+.dept-chip b { color:#003087; display:block; margin-bottom:2px; }
+.guide-pill-group { margin-top:10px; }
+.guide-pill-toggle {
+  display:inline-flex; align-items:center; gap:6px;
+  padding:4px 10px; border-radius:999px;
+  border:1px solid #b9c9e6; background:#fff; color:#003087;
+  font-size:8.5px; font-weight:bold; letter-spacing:.02em; cursor:pointer;
+  user-select:none; transition:all .15s ease;
+}
+.guide-pill-toggle span:first-child { white-space:nowrap; }
+.guide-pill-toggle:hover { border-color:#7aa6da; background:#f5f9ff; }
+.guide-pill-toggle.open { background:#eaf3ff; border-color:#4f8fd6; color:#002b73; }
+.guide-pill-toggle.dept-subpill { font-size:8px; padding:4px 9px; }
+.guide-pill-toggle.dept-admin-pill { background:#edf7f1; border-color:#9bc9aa; color:#1f5e37; box-shadow:inset 0 0 0 1px rgba(31,94,55,.05); }
+.guide-pill-toggle.dept-admin-pill:hover { background:#e3f2e8; border-color:#74b48a; }
+.guide-pill-toggle.dept-admin-pill.open { background:#d8ecdf; border-color:#4e9a6a; color:#184c2c; }
+.guide-pill-toggle.dept-academic-pill { background:#eef4ff; border-color:#9fb9ea; color:#244e97; box-shadow:inset 0 0 0 1px rgba(36,78,151,.05); }
+.guide-pill-toggle.dept-academic-pill:hover { background:#e5efff; border-color:#7aa0df; }
+.guide-pill-toggle.dept-academic-pill.open { background:#dce9ff; border-color:#4f84d6; color:#173d7a; }
+.guide-pill-toggle.dept-centers-pill { background:#f5efff; border-color:#bea6ec; color:#6440a8; box-shadow:inset 0 0 0 1px rgba(100,64,168,.05); }
+.guide-pill-toggle.dept-centers-pill:hover { background:#efe6ff; border-color:#a07ee0; }
+.guide-pill-toggle.dept-centers-pill.open { background:#e8dcff; border-color:#8559d6; color:#4e2e8e; }
+.guide-pill-caret { font-size:8px; line-height:1; }
+.guide-pill-panel { display:none; margin-top:6px; }
+.guide-pill-panel.open { display:block; }
+.overview-panel-wrap { padding:8px 10px 9px; border-bottom:1px solid #d9dfe8; background:#f8fbff; display:none; }
+.overview-panel-wrap.open { display:block; }
+.overview-panel-card { border:1px solid #d4dfef; background:#fff; border-radius:10px; padding:8px 10px; }
+.overview-panel-title { font-size:10px; font-weight:bold; color:#003087; margin-bottom:4px; }
+.overview-panel-body { font-size:9px; line-height:1.55; color:#233; }
+.overview-panel-list { margin-top:5px; padding-left:14px; }
+.overview-panel-list li { margin:1px 0; }
+.walkthrough-controls { display:flex; gap:6px; margin-top:8px; }
+.walkthrough-mini { padding:3px 8px; border-radius:999px; border:1px solid #b9c9e6; background:#fff; color:#003087; font-size:8px; font-weight:bold; cursor:pointer; }
+.walkthrough-mini:hover { background:#f5f9ff; }
+
+.footnotes { padding:2px 6px 8px; font-size:7.5px; color:#444; font-style:italic; }
+.training-badge { background:#003087; color:#fff; font-size:9px; padding:4px 10px; border-radius:999px; border:1px solid rgba(255,255,255,.18); box-shadow:0 2px 8px rgba(0,48,135,.18); letter-spacing:.01em; white-space:nowrap; }
+
+  .training-badge-wrap { position:fixed; bottom:10px; left:10px; display:flex; align-items:center; gap:7px; z-index:999; }
+  .interactive-hint { background:rgba(255,255,255,.96); color:#003087; font-size:9px; font-weight:700; padding:4px 12px; border-radius:999px; border:1.5px solid rgba(0,48,135,.28); box-shadow:0 2px 8px rgba(0,48,135,.12); letter-spacing:.01em; cursor:default; transition:all .2s ease; animation:headerHintPulse 8s ease-in-out infinite; white-space:nowrap; }
+  .interactive-hint:hover { background:#f4f8ff; border-color:rgba(0,48,135,.38); transform:translateY(-1px); }
+  @keyframes headerHintPulse { 0%,100%{ transform:scale(1); box-shadow:0 2px 8px rgba(0,48,135,.08); background:rgba(255,255,255,.96); } 45%{ transform:scale(1.018); box-shadow:0 4px 14px rgba(0,48,135,.14); background:#f4f8ff; } }
+</style>
+</head>
+<body>
+<div id="zoom-wrapper">
+<div id="report-panel">
+  <div id="report-static">
+    <div class="nav-bar">
+      <a href="#">&lt; Previous Accounting Period</a>
+      <a href="#">Chartfield Detail Statement</a>
+      <a href="#">Chartfield Transaction Statement</a>
+      <a href="#">Trial Balance by Account Detail</a>
+      <a href="#">Payroll Summary Report</a>
+      <a href="#">Payroll Detail Report</a>
+      <a href="#">Next Accounting Period &gt;</a>
+    </div>
+    <div class="header-top">
+      <div class="logo-area">
+        <div class="logo-crown">♛</div>
+        <div class="logo-text">
+          <div class="cu-name">Columbia University</div>
+          <div class="cu-sub">In the City of New York</div>
+        </div>
+      </div>
+      <div class="center-titles">
+        <div class="fds">Financial Data Store</div>
+        <div class="t1">Columbia University</div>
+        <div class="t2">Trial Balance by Account Detail</div>
+        <div class="t3">From July 2025 to March 2026</div>
+      </div>
+      <div class="run-block">
+        <div><b>Run Date:</b> 04/20/2026</div>
+        <div><b>Run Time:</b> 2:09:54PM</div>
+      </div>
+    </div>
+    <div class="meta-block">
+      <div><b>Report ID:</b> GL_RPT1011.1 &nbsp;&nbsp; <b>Run ID:</b> mwt2112</div>
+      <div><b>Business Unit(s):</b> COLUM - Columbia University</div>
+      <div><b>From Account:</b> 00000 &nbsp;&nbsp; <b>To Account:</b> 99999</div>
+      <div><b>Fund:</b> ALL</div>
+      <div><b>Department(s):</b> ALL</div>
+      <div><b>Project(s):</b> UR012345 - ENG Training</div>
+      <div><b>Activity(s):</b> ALL &nbsp;&nbsp; <b>Initiative(s):</b> ALL &nbsp;&nbsp; <b>Segment(s):</b> ALL &nbsp;&nbsp; <b>Site:</b> ALL &nbsp;&nbsp; <b>Function(s):</b> ALL</div>
+    </div>
+
+    <div class="overview-panel-wrap" id="overview-panel">
+      <div class="overview-panel-card">
+        <div class="overview-panel-title">What this report helps you do</div>
+        <div class="overview-panel-body">
+          This is one of the strongest reports for transaction-level reconciliation in the General Ledger. Use it to review year-to-date detail across accounts, departments, projects, and other chartfields so you can confirm that charges are appropriate, supported, and posted to the right place.
+          <ul class="overview-panel-list">
+            <li>review detailed ledger activity across accounts, departments, and projects</li>
+            <li>confirm whether expenditures look appropriate for reconciliation</li>
+            <li>trace transactions back to source, voucher, and procurement detail</li>
+            <li>identify items that need correction before period close</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- PILL BAR — hidden, ↑ to activate -->
+    <div class="pill-bar-wrap" id="pill-bar" style="display:none;">
+      <span class="pill-bar-label">Highlight:</span>
+      <div class="pill" data-pill="overview" onclick="toggleOverviewPill(this)"><span class="pill-dot"></span> What this report helps you do</div>
+      <div class="pill" data-pill="walkthrough" onclick="startWalkthroughFromPill(this)"><span class="pill-dot"></span> Start Guided Walkthrough</div>
+      <div class="pill" data-pill="chartfield" onclick="togglePill(this)"><span class="pill-dot"></span> ChartString</div>
+      <div class="pill" data-pill="who" onclick="togglePill(this)"><span class="pill-dot"></span> Vendor / Who</div>
+      <div class="pill" data-pill="amount" onclick="togglePill(this)"><span class="pill-dot"></span> Amount</div>
+    </div>
+  </div><!-- /report-static -->
+
+  <div id="table-scroll-area">
+  <div class="table-wrapper" id="table-wrapper">
+  <table class="tbal" id="main-table">
+    <thead>
+      <tr>
+        <th class="lft" data-key="bu">BU</th>
+        <th class="lft col-chartfield" data-key="fund">Fund</th>
+        <th class="lft col-chartfield col-chartstring" data-key="account">Account</th>
+        <th class="lft col-chartfield col-chartstring" data-key="account_desc">Account<br>Description</th>
+        <th class="lft col-chartfield col-chartstring" data-key="dept">Dept</th>
+        <th class="lft col-chartfield col-chartstring" data-key="dept_desc">Department<br>Description</th>
+        <th class="lft col-chartfield col-chartstring" data-key="project">Project</th>
+        <th class="lft col-chartfield col-chartstring" data-key="project_desc">Project<br>Description</th>
+        <th class="lft col-chartfield col-chartstring" data-key="activity">Activity</th>
+        <th class="lft col-chartfield col-chartstring" data-key="activity_desc">Activity<br>Description</th>
+        <th class="lft col-chartfield col-chartstring" data-key="initiative">Initiative</th>
+        <th class="lft col-chartfield col-chartstring" data-key="initiative_desc">Initiative<br>Description</th>
+        <th class="lft col-chartfield col-chartstring" data-key="segment">Segment</th>
+        <th class="lft col-chartfield col-chartstring" data-key="segment_desc">Segment<br>Description</th>
+        <th class="lft" data-key="site">Site</th>
+        <th class="lft" data-key="site_desc">Site<br>Description</th>
+        <th class="lft col-chartfield" data-key="function">Function</th>
+        <th class="lft col-chartfield" data-key="function_desc">Function<br>Description</th>
+        <th data-key="journal_date">Journal Date</th>
+        <th data-key="vendor_id">Vendor ID</th>
+        <th class="col-who" data-key="vendor_name">Transaction Description / Vendor Name</th>
+        <th data-key="pcard_merchant">P-Card Merchant</th>
+        <th class="col-payment" data-key="po_num">PO#</th>
+        <th class="col-payment" data-key="invoice_id">Invoice ID</th>
+        <th data-key="invoice_date">Invoice Date</th>
+        <th data-key="source">Source</th>
+        <th class="col-payment" data-key="voucher_type">Voucher Type</th>
+        <th class="col-payment" data-key="voucher_num">Voucher#</th>
+        <th class="lft" data-key="voucher_line_desc">Voucher Line Description or Journal Line Ref.</th>
+        <th class="lft" data-key="voucher_comments">Voucher Comments</th>
+        <th class="r col-amount" data-key="amount">Amount</th>
+        <th class="col-payment" data-key="journal_id">Journal ID</th>
+        <th class="col-payment" data-key="line_num">Journal Line</th>
+      </tr>
+    </thead>
+    <tbody>
+<!-- Rows: BU|Fund|Acct|AcctDesc|Dept|DeptDesc|Project|ProjDesc|Act|ActDesc|Init|InitDesc|Seg|SegDesc|Site|SiteDesc|Func|FuncDesc|JDate|PO|VendorName|InvID|Source|VType|Voucher|LineDesc|Comments|Amount|JrnlID|LineNum -->
+<tr><td>COLUM</td><td class="col-chartfield">01</td><td class="col-chartfield">52220</td><td class="col-chartfield">POSTDOC RESEARCH SCIENTIST-FT</td><td class="col-chartfield">5201234</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">UR012345</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">01</td><td class="col-chartfield">ENG TRAINING</td><td class="col-chartfield">29214</td><td class="col-chartfield">ENG Dept General Operations</td><td class="col-chartfield">abc1234</td><td class="col-chartfield">abc1234</td><td></td><td></td><td class="col-chartfield">215</td><td class="col-chartfield">GENERAL &amp; FINANCIAL ADMIN</td><td>07/22/2025</td><td class="col-payment"></td><td class="col-who"></td><td class="col-payment"></td><td>PAY</td><td class="col-payment"></td><td class="col-payment">PAY2158587</td><td></td><td></td><td class="r col-amount">5,364.13</td><td class="col-payment">PAY2158587</td><td class="col-payment">111</td></tr>
+<tr><td>COLUM</td><td class="col-chartfield">01</td><td class="col-chartfield">52220</td><td class="col-chartfield">POSTDOC RESEARCH SCIENTIST-FT</td><td class="col-chartfield">5201234</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">UR012345</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">01</td><td class="col-chartfield">ENG TRAINING</td><td class="col-chartfield">29214</td><td class="col-chartfield">ENG Dept General Operations</td><td class="col-chartfield">abc1234</td><td class="col-chartfield">abc1234</td><td></td><td></td><td class="col-chartfield">215</td><td class="col-chartfield">GENERAL &amp; FINANCIAL ADMIN</td><td>08/15/2025</td><td class="col-payment"></td><td class="col-who"></td><td class="col-payment"></td><td>PAY</td><td class="col-payment"></td><td class="col-payment">PAY2165243</td><td></td><td></td><td class="r col-amount">1,500.00</td><td class="col-payment">PAY2165243</td><td class="col-payment">9081</td></tr>
+<tr><td>COLUM</td><td class="col-chartfield">01</td><td class="col-chartfield">52220</td><td class="col-chartfield">POSTDOC RESEARCH SCIENTIST-FT</td><td class="col-chartfield">5201234</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">UR012345</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">01</td><td class="col-chartfield">ENG TRAINING</td><td class="col-chartfield">29214</td><td class="col-chartfield">ENG Dept General Operations</td><td class="col-chartfield">abc1234</td><td class="col-chartfield">abc1234</td><td></td><td></td><td class="col-chartfield">215</td><td class="col-chartfield">GENERAL &amp; FINANCIAL ADMIN</td><td>09/12/2025</td><td class="col-payment"></td><td class="col-who"></td><td class="col-payment"></td><td>PAY</td><td class="col-payment"></td><td class="col-payment">PAY2173775</td><td></td><td></td><td class="r col-amount">19,312.50</td><td class="col-payment">PAY2173775</td><td class="col-payment">596</td></tr>
+<tr><td>COLUM</td><td class="col-chartfield">01</td><td class="col-chartfield">52220</td><td class="col-chartfield">POSTDOC RESEARCH SCIENTIST-FT</td><td class="col-chartfield">5201234</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">UR012345</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">01</td><td class="col-chartfield">ENG TRAINING</td><td class="col-chartfield">29214</td><td class="col-chartfield">ENG Dept General Operations</td><td class="col-chartfield">abc1234</td><td class="col-chartfield">abc1234</td><td></td><td></td><td class="col-chartfield">215</td><td class="col-chartfield">GENERAL &amp; FINANCIAL ADMIN</td><td>09/30/2025</td><td class="col-payment"></td><td class="col-who"></td><td class="col-payment"></td><td>PAY</td><td class="col-payment"></td><td class="col-payment">PAY2176911</td><td></td><td></td><td class="r col-amount">3,862.50</td><td class="col-payment">PAY2176911</td><td class="col-payment">9908</td></tr>
+<tr><td>COLUM</td><td class="col-chartfield">01</td><td class="col-chartfield">52220</td><td class="col-chartfield">POSTDOC RESEARCH SCIENTIST-FT</td><td class="col-chartfield">5201234</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">UR012345</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">01</td><td class="col-chartfield">ENG TRAINING</td><td class="col-chartfield">29214</td><td class="col-chartfield">ENG Dept General Operations</td><td class="col-chartfield">abc1234</td><td class="col-chartfield">abc1234</td><td></td><td></td><td class="col-chartfield">215</td><td class="col-chartfield">GENERAL &amp; FINANCIAL ADMIN</td><td>10/10/2025</td><td class="col-payment"></td><td class="col-who"></td><td class="col-payment"></td><td>PAY</td><td class="col-payment"></td><td class="col-payment">PAY2183124</td><td></td><td></td><td class="neg col-amount">(23,175.00)</td><td class="col-payment">PAY2183124</td><td class="col-payment">238</td></tr>
+<tr><td>COLUM</td><td class="col-chartfield">01</td><td class="col-chartfield">53300</td><td class="col-chartfield">OFFICER OF ADMINISTRATION</td><td class="col-chartfield">5201234</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">UR012345</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">01</td><td class="col-chartfield">ENG TRAINING</td><td class="col-chartfield">00000</td><td class="col-chartfield">Undefined Initiative</td><td class="col-chartfield">00000000</td><td class="col-chartfield">Undefined Segment</td><td></td><td></td><td class="col-chartfield">215</td><td class="col-chartfield">GENERAL &amp; FINANCIAL ADMIN</td><td>07/15/2025</td><td class="col-payment"></td><td class="col-who"></td><td class="col-payment"></td><td>PAY</td><td class="col-payment"></td><td class="col-payment">PAY2153467</td><td></td><td></td><td class="r col-amount">9,817.92</td><td class="col-payment">PAY2153467</td><td class="col-payment">1235</td></tr>
+<tr><td>COLUM</td><td class="col-chartfield">01</td><td class="col-chartfield">53300</td><td class="col-chartfield">OFFICER OF ADMINISTRATION</td><td class="col-chartfield">5201234</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">UR012345</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">01</td><td class="col-chartfield">ENG TRAINING</td><td class="col-chartfield">00000</td><td class="col-chartfield">Undefined Initiative</td><td class="col-chartfield">00000000</td><td class="col-chartfield">Undefined Segment</td><td></td><td></td><td class="col-chartfield">215</td><td class="col-chartfield">GENERAL &amp; FINANCIAL ADMIN</td><td>07/18/2025</td><td class="col-payment"></td><td class="col-who"></td><td class="col-payment"></td><td>PAY</td><td class="col-payment"></td><td class="col-payment">PAY2157979</td><td></td><td></td><td class="neg col-amount">(29,347.10)</td><td class="col-payment">PAY2157979</td><td class="col-payment">42</td></tr>
+<tr><td>COLUM</td><td class="col-chartfield">01</td><td class="col-chartfield">58999</td><td class="col-chartfield">SALARY CONTROLLER ADJUSTMENT</td><td class="col-chartfield">5201234</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">UR012345</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">01</td><td class="col-chartfield">ENG TRAINING</td><td class="col-chartfield">00000</td><td class="col-chartfield">Undefined Initiative</td><td class="col-chartfield">00000000</td><td class="col-chartfield">Undefined Segment</td><td></td><td></td><td class="col-chartfield">215</td><td class="col-chartfield">GENERAL &amp; FINANCIAL ADMIN</td><td>07/01/2025</td><td class="col-payment"></td><td class="col-who">FY25 Grants Exp Adj_Jul 2025</td><td class="col-payment"></td><td>ONL</td><td class="col-payment"></td><td class="col-payment">0002168350</td><td>FY25GG</td><td></td><td class="r col-amount">3,541.67</td><td class="col-payment">0002168350</td><td class="col-payment">115</td></tr>
+<tr><td>COLUM</td><td class="col-chartfield">01</td><td class="col-chartfield">58999</td><td class="col-chartfield">SALARY CONTROLLER ADJUSTMENT</td><td class="col-chartfield">5201234</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">UR012345</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">01</td><td class="col-chartfield">ENG TRAINING</td><td class="col-chartfield">00000</td><td class="col-chartfield">Undefined Initiative</td><td class="col-chartfield">00000000</td><td class="col-chartfield">Undefined Segment</td><td></td><td></td><td class="col-chartfield">215</td><td class="col-chartfield">GENERAL &amp; FINANCIAL ADMIN</td><td>07/01/2025</td><td class="col-payment"></td><td class="col-who">FY25 Grants Exp Adj_Jul 2025</td><td class="col-payment"></td><td>ONL</td><td class="col-payment"></td><td class="col-payment">0002168350</td><td>FY25GG</td><td></td><td class="r col-amount">6,222.92</td><td class="col-payment">0002168350</td><td class="col-payment">129</td></tr>
+<tr><td>COLUM</td><td class="col-chartfield">01</td><td class="col-chartfield">59010</td><td class="col-chartfield">FRINGE BENEFIT CHARGE</td><td class="col-chartfield">5201234</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">UR012345</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">01</td><td class="col-chartfield">ENG TRAINING</td><td class="col-chartfield">00000</td><td class="col-chartfield">Undefined Initiative</td><td class="col-chartfield">00000000</td><td class="col-chartfield">Undefined Segment</td><td></td><td></td><td class="col-chartfield">215</td><td class="col-chartfield">GENERAL &amp; FINANCIAL ADMIN</td><td>07/15/2025</td><td class="col-payment"></td><td class="col-who"></td><td class="col-payment"></td><td>PAY</td><td class="col-payment"></td><td class="col-payment">PAY2153467</td><td></td><td></td><td class="r col-amount">2,945.38</td><td class="col-payment">PAY2153467</td><td class="col-payment">9597</td></tr>
+<tr><td>COLUM</td><td class="col-chartfield">01</td><td class="col-chartfield">59010</td><td class="col-chartfield">FRINGE BENEFIT CHARGE</td><td class="col-chartfield">5201234</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">UR012345</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">01</td><td class="col-chartfield">ENG TRAINING</td><td class="col-chartfield">00000</td><td class="col-chartfield">Undefined Initiative</td><td class="col-chartfield">00000000</td><td class="col-chartfield">Undefined Segment</td><td></td><td></td><td class="col-chartfield">215</td><td class="col-chartfield">GENERAL &amp; FINANCIAL ADMIN</td><td>07/18/2025</td><td class="col-payment"></td><td class="col-who"></td><td class="col-payment"></td><td>PAY</td><td class="col-payment"></td><td class="col-payment">PAY2157979</td><td></td><td></td><td class="neg col-amount">(8,804.14)</td><td class="col-payment">PAY2157979</td><td class="col-payment">385</td></tr>
+<tr><td>COLUM</td><td class="col-chartfield">01</td><td class="col-chartfield">59010</td><td class="col-chartfield">FRINGE BENEFIT CHARGE</td><td class="col-chartfield">5201234</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">UR012345</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">01</td><td class="col-chartfield">ENG TRAINING</td><td class="col-chartfield">29214</td><td class="col-chartfield">ENG Dept General Operations</td><td class="col-chartfield">abc1234</td><td class="col-chartfield">abc1234</td><td></td><td></td><td class="col-chartfield">215</td><td class="col-chartfield">GENERAL &amp; FINANCIAL ADMIN</td><td>09/12/2025</td><td class="col-payment"></td><td class="col-who"></td><td class="col-payment"></td><td>PAY</td><td class="col-payment"></td><td class="col-payment">PAY2173775</td><td></td><td></td><td class="r col-amount">5,793.75</td><td class="col-payment">PAY2173775</td><td class="col-payment">1171</td></tr>
+<tr><td>COLUM</td><td class="col-chartfield">01</td><td class="col-chartfield">59020</td><td class="col-chartfield">FRINGE ADDITIONAL</td><td class="col-chartfield">5201234</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">UR012345</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">01</td><td class="col-chartfield">ENG TRAINING</td><td class="col-chartfield">00000</td><td class="col-chartfield">Undefined Initiative</td><td class="col-chartfield">00000000</td><td class="col-chartfield">Undefined Segment</td><td></td><td></td><td class="col-chartfield">215</td><td class="col-chartfield">GENERAL &amp; FINANCIAL ADMIN</td><td>07/15/2025</td><td class="col-payment"></td><td class="col-who"></td><td class="col-payment"></td><td>PAY</td><td class="col-payment"></td><td class="col-payment">PAY2153467</td><td></td><td></td><td class="r col-amount">392.72</td><td class="col-payment">PAY2153467</td><td class="col-payment">6755</td></tr>
+<tr><td>COLUM</td><td class="col-chartfield">01</td><td class="col-chartfield">59020</td><td class="col-chartfield">FRINGE ADDITIONAL</td><td class="col-chartfield">5201234</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">UR012345</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">01</td><td class="col-chartfield">ENG TRAINING</td><td class="col-chartfield">29214</td><td class="col-chartfield">ENG Dept General Operations</td><td class="col-chartfield">abc1234</td><td class="col-chartfield">abc1234</td><td></td><td></td><td class="col-chartfield">215</td><td class="col-chartfield">GENERAL &amp; FINANCIAL ADMIN</td><td>09/12/2025</td><td class="col-payment"></td><td class="col-who"></td><td class="col-payment"></td><td>PAY</td><td class="col-payment"></td><td class="col-payment">PAY2173775</td><td></td><td></td><td class="r col-amount">772.50</td><td class="col-payment">PAY2173775</td><td class="col-payment">480</td></tr>
+<tr><td>COLUM</td><td class="col-chartfield">01</td><td class="col-chartfield">59099</td><td class="col-chartfield">FRINGE CONTROLLER ADJUSTMENT</td><td class="col-chartfield">5201234</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">UR012345</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">01</td><td class="col-chartfield">ENG TRAINING</td><td class="col-chartfield">00000</td><td class="col-chartfield">Undefined Initiative</td><td class="col-chartfield">00000000</td><td class="col-chartfield">Undefined Segment</td><td></td><td></td><td class="col-chartfield">215</td><td class="col-chartfield">GENERAL &amp; FINANCIAL ADMIN</td><td>07/01/2025</td><td class="col-payment"></td><td class="col-who">FY25 Grants Exp Adj_Jul 2025</td><td class="col-payment"></td><td>ONL</td><td class="col-payment"></td><td class="col-payment">0002168350</td><td>FY25GG</td><td></td><td class="r col-amount">1,062.50</td><td class="col-payment">0002168350</td><td class="col-payment">109</td></tr>
+<tr><td>COLUM</td><td class="col-chartfield">01</td><td class="col-chartfield">59099</td><td class="col-chartfield">FRINGE CONTROLLER ADJUSTMENT</td><td class="col-chartfield">5201234</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">UR012345</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">01</td><td class="col-chartfield">ENG TRAINING</td><td class="col-chartfield">00000</td><td class="col-chartfield">Undefined Initiative</td><td class="col-chartfield">00000000</td><td class="col-chartfield">Undefined Segment</td><td></td><td></td><td class="col-chartfield">215</td><td class="col-chartfield">GENERAL &amp; FINANCIAL ADMIN</td><td>07/01/2025</td><td class="col-payment"></td><td class="col-who">FY25 Grants Exp Adj_Jul 2025</td><td class="col-payment"></td><td>ONL</td><td class="col-payment"></td><td class="col-payment">0002168350</td><td>FY25GG</td><td></td><td class="r col-amount">1,866.88</td><td class="col-payment">0002168350</td><td class="col-payment">131</td></tr>
+<tr><td>COLUM</td><td class="col-chartfield">01</td><td class="col-chartfield">63010</td><td class="col-chartfield">RENTAL - FACILITIES</td><td class="col-chartfield">5201234</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">UR012345</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">01</td><td class="col-chartfield">ENG TRAINING</td><td class="col-chartfield">29225</td><td class="col-chartfield">ENG Recruitment Other</td><td class="col-chartfield">abc1234</td><td class="col-chartfield">abc1234</td><td></td><td></td><td class="col-chartfield">305</td><td class="col-chartfield">OPS &amp; MAINTENANCE OF PLANT</td><td>03/23/2026</td><td class="col-payment">0000058054</td><td class="col-who">AVI FOODSYSTEMS INC</td><td class="col-payment">CU00139345</td><td>AP</td><td class="col-payment">I</td><td class="col-payment">V0308849</td><td>Cheese Board Labor</td><td>A3025R</td><td class="r col-amount">1,064.62</td><td class="col-payment">AP02221468</td><td class="col-payment">2</td></tr>
+<tr><td>COLUM</td><td class="col-chartfield">01</td><td class="col-chartfield">63010</td><td class="col-chartfield">RENTAL - FACILITIES</td><td class="col-chartfield">5201234</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">UR012345</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">01</td><td class="col-chartfield">ENG TRAINING</td><td class="col-chartfield">29225</td><td class="col-chartfield">ENG Recruitment Other</td><td class="col-chartfield">abc1234</td><td class="col-chartfield">abc1234</td><td></td><td></td><td class="col-chartfield">305</td><td class="col-chartfield">OPS &amp; MAINTENANCE OF PLANT</td><td>03/23/2026</td><td class="col-payment">0000058054</td><td class="col-who">AVI FOODSYSTEMS INC</td><td class="col-payment">CU00139345</td><td>AP</td><td class="col-payment">I</td><td class="col-payment">V0308849</td><td>Cheese Board Final Payment</td><td>A3025R</td><td class="r col-amount">484.01</td><td class="col-payment">AP02221468</td><td class="col-payment">1</td></tr>
+<tr><td>COLUM</td><td class="col-chartfield">01</td><td class="col-chartfield">63010</td><td class="col-chartfield">RENTAL - FACILITIES</td><td class="col-chartfield">5201234</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">UR012345</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">01</td><td class="col-chartfield">ENG TRAINING</td><td class="col-chartfield">29225</td><td class="col-chartfield">ENG Recruitment Other</td><td class="col-chartfield">abc1234</td><td class="col-chartfield">abc1234</td><td></td><td></td><td class="col-chartfield">305</td><td class="col-chartfield">OPS &amp; MAINTENANCE OF PLANT</td><td>03/31/2026</td><td class="col-payment"></td><td class="col-who">AVI FOODSYSTEMS INC</td><td class="col-payment"></td><td>APA</td><td class="col-payment">L2D2</td><td class="col-payment">APACCR0901</td><td></td><td>VV0308826-AVI FOODSYSTEMS INC</td><td class="r col-amount">427.42</td><td class="col-payment">APACCR0901</td><td class="col-payment">203</td></tr>
+<tr><td>COLUM</td><td class="col-chartfield">01</td><td class="col-chartfield">64240</td><td class="col-chartfield">FEES TO AGENCIES</td><td class="col-chartfield">5201234</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">UR012345</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">01</td><td class="col-chartfield">ENG TRAINING</td><td class="col-chartfield">00000</td><td class="col-chartfield">Undefined Initiative</td><td class="col-chartfield"></td><td class="col-chartfield"></td><td></td><td></td><td class="col-chartfield">215</td><td class="col-chartfield">GENERAL &amp; FINANCIAL ADMIN</td><td>02/11/2026</td><td class="col-payment">CNR0015353</td><td class="col-who">CASEY MORGAN</td><td class="col-payment">441388-C</td><td>AP</td><td class="col-payment">Y</td><td class="col-payment">07073705</td><td>Booking Fees</td><td>Report Name: Booking fee Report Purpose: Other Business Expenses</td><td class="r col-amount">5.00</td><td class="col-payment">AP02212776</td><td class="col-payment">1</td></tr>
+<tr><td>COLUM</td><td class="col-chartfield">01</td><td class="col-chartfield">64350</td><td class="col-chartfield">MEETINGS AND EVENTS</td><td class="col-chartfield">5201234</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">UR012345</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">01</td><td class="col-chartfield">ENG TRAINING</td><td class="col-chartfield">60908</td><td class="col-chartfield">ENG Specific Research</td><td class="col-chartfield">abc1234</td><td class="col-chartfield">abc1234</td><td></td><td></td><td class="col-chartfield">235</td><td class="col-chartfield">DEPARTMENT RESEARCH</td><td>08/31/2025</td><td class="col-payment"></td><td class="col-who">MAROSA INC</td><td class="col-payment"></td><td>APA</td><td class="col-payment">L1D1</td><td class="col-payment">APACCR0206</td><td></td><td>VV0144018-MAROSA INC</td><td class="r col-amount">171.00</td><td class="col-payment">APACCR0206</td><td class="col-payment">1459</td></tr>
+<tr><td>COLUM</td><td class="col-chartfield">01</td><td class="col-chartfield">64350</td><td class="col-chartfield">MEETINGS AND EVENTS</td><td class="col-chartfield">5201234</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">UR012345</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">01</td><td class="col-chartfield">ENG TRAINING</td><td class="col-chartfield">29225</td><td class="col-chartfield">ENG Recruitment Other</td><td class="col-chartfield">abc1234</td><td class="col-chartfield">abc1234</td><td></td><td></td><td class="col-chartfield">215</td><td class="col-chartfield">GENERAL &amp; FINANCIAL ADMIN</td><td>10/29/2025</td><td class="col-payment"></td><td class="col-who">Training seminar, room reservation</td><td class="col-payment"></td><td>ITF</td><td class="col-payment"></td><td class="col-payment">TRF0000001</td><td>Training seminar, room reservation</td><td></td><td class="r col-amount">235.00</td><td class="col-payment">0002185436</td><td class="col-payment">1</td></tr>
+<tr><td>COLUM</td><td class="col-chartfield">01</td><td class="col-chartfield">64350</td><td class="col-chartfield">MEETINGS AND EVENTS</td><td class="col-chartfield">5201234</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">UR012345</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">01</td><td class="col-chartfield">ENG TRAINING</td><td class="col-chartfield">60908</td><td class="col-chartfield">ENG Specific Research</td><td class="col-chartfield">abc1234</td><td class="col-chartfield">abc1234</td><td></td><td></td><td class="col-chartfield">235</td><td class="col-chartfield">DEPARTMENT RESEARCH</td><td>12/12/2025</td><td class="col-payment">0000003888</td><td class="col-who">MAROSA INC</td><td class="col-payment">7498204</td><td>AP</td><td class="col-payment">I</td><td class="col-payment">V0144018</td><td>Training AI Brainstorming Session</td><td></td><td class="r col-amount">171.00</td><td class="col-payment">AP02199033</td><td class="col-payment">1</td></tr>
+<tr><td>COLUM</td><td class="col-chartfield">01</td><td class="col-chartfield">64350</td><td class="col-chartfield">MEETINGS AND EVENTS</td><td class="col-chartfield">5201234</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">UR012345</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">01</td><td class="col-chartfield">ENG TRAINING</td><td class="col-chartfield">29225</td><td class="col-chartfield">ENG Recruitment Other</td><td class="col-chartfield">abc1234</td><td class="col-chartfield">abc1234</td><td></td><td></td><td class="col-chartfield">215</td><td class="col-chartfield">GENERAL &amp; FINANCIAL ADMIN</td><td>01/07/2026</td><td class="col-payment"></td><td class="col-who">Training seminar,5/21 Room reserve</td><td class="col-payment"></td><td>ITF</td><td class="col-payment"></td><td class="col-payment">TRF0000002</td><td>Training seminar,5/21 Room reserve</td><td></td><td class="r col-amount">235.00</td><td class="col-payment">0002203990</td><td class="col-payment">3</td></tr>
+<tr><td>COLUM</td><td class="col-chartfield">01</td><td class="col-chartfield">65330</td><td class="col-chartfield">INTERNATIONAL-LODGING</td><td class="col-chartfield">5201234</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">UR012345</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">01</td><td class="col-chartfield">ENG TRAINING</td><td class="col-chartfield">00000</td><td class="col-chartfield">Undefined Initiative</td><td class="col-chartfield">abc1234</td><td class="col-chartfield">abc1234</td><td></td><td></td><td class="col-chartfield">215</td><td class="col-chartfield">GENERAL &amp; FINANCIAL ADMIN</td><td>01/29/2026</td><td class="col-payment">CNR0136811</td><td class="col-who">DEVON PARKER</td><td class="col-payment">433623-R</td><td>AP</td><td class="col-payment">C</td><td class="col-payment">07062640</td><td>Hotel/Lodging</td><td>Report Name: ICML 2025 Report Purpose: Conference</td><td class="r col-amount">6.54</td><td class="col-payment">AP02208975</td><td class="col-payment">12</td></tr>
+<tr><td>COLUM</td><td class="col-chartfield">01</td><td class="col-chartfield">66155</td><td class="col-chartfield">SALES TAX</td><td class="col-chartfield">5201234</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">UR012345</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">01</td><td class="col-chartfield">ENG TRAINING</td><td class="col-chartfield">00000</td><td class="col-chartfield">Undefined Initiative</td><td class="col-chartfield">abc1234</td><td class="col-chartfield">abc1234</td><td></td><td></td><td class="col-chartfield">215</td><td class="col-chartfield">GENERAL &amp; FINANCIAL ADMIN</td><td>01/29/2026</td><td class="col-payment">CNR0136811</td><td class="col-who">DEVON PARKER</td><td class="col-payment">433623-R</td><td>AP</td><td class="col-payment">C</td><td class="col-payment">07062640</td><td>Hotel/Lodging Tax</td><td>Report Name: ICML 2025 Report Purpose: Conference</td><td class="r col-amount">1.56</td><td class="col-payment">AP02208975</td><td class="col-payment">5</td></tr>
+<tr><td>COLUM</td><td class="col-chartfield">01</td><td class="col-chartfield">66326</td><td class="col-chartfield">ADVERT - JOB VACANCY/RECRUIT</td><td class="col-chartfield">5201234</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">UR012345</td><td class="col-chartfield">ENG Training</td><td class="col-chartfield">01</td><td class="col-chartfield">ENG TRAINING</td><td class="col-chartfield">29225</td><td class="col-chartfield">ENG Recruitment Other</td><td class="col-chartfield">abc1234</td><td class="col-chartfield">abc1234</td><td></td><td></td><td class="col-chartfield">215</td><td class="col-chartfield">GENERAL &amp; FINANCIAL ADMIN</td><td>11/05/2025</td><td class="col-payment">0000250285</td><td class="col-who">Blue Dog Corporate Gifts LLC</td><td class="col-payment">28011</td><td>AP</td><td class="col-payment">I</td><td class="col-payment">V0208847</td><td>Round Cork Coaster</td><td></td><td class="r col-amount">499.00</td><td class="col-payment">AP02189741</td><td class="col-payment">1</td></tr>
+      <tr class="grand-total">
+        <td class="lbl" colspan="30">Grand Total</td>
+        <td>13,792.75</td>
+        <td colspan="2"></td>
+      </tr>
+    </tbody>
+  </table>
+  </div>
+  <div class="footnotes">Columbia University Proprietary and Confidential &nbsp;&nbsp; Page No. 1-2</div>
+  </div>
+</div><!-- /report-panel -->
+
+<div id="explain-panel">
+  <div class="panel-header">
+    <span>📘 Field Guide <span class="panel-tab-hint">click again to close</span></span>
+    <button id="panel-close" title="Close (Esc)">✕</button>
+  </div>
+  <div id="explain-inner">
+    <div id="explain-content">
+      <p style="color:#555;font-size:10px;line-height:1.55;">Click any <strong style="color:#003087;">column header</strong> to learn what it means.</p>
+    </div>
+  </div>
+</div>
+</div><!-- /zoom-wrapper -->
+<div class="training-badge-wrap"><div class="training-badge">🎓 Training Mode</div><div class="interactive-hint" id="interactive-hint">🖱 Click Headers to Explore</div></div>
+
+<script>
+var PILL_CFG = {
+  who: {
+    colClass:'col-who',
+    text:'#0a5c6e', line:'rgba(14,116,144,.18)', strong:'rgba(14,116,144,.34)',
+    soft:'rgba(14,116,144,.08)', fill:'rgba(14,116,144,.015)', cell:'rgba(14,116,144,.035)',
+    rCenter:'rgba(14,116,144,.04)', rMid:'rgba(14,116,144,.015)', edge:'rgba(14,116,144,.55)'
+  },
+  chartfield: {
+    colClass:'col-chartstring',
+    text:'#335c8a', line:'rgba(111,159,214,.18)', strong:'rgba(111,159,214,.34)',
+    soft:'rgba(111,159,214,.08)', fill:'rgba(111,159,214,.015)', cell:'rgba(111,159,214,.035)',
+    rCenter:'rgba(0,48,135,.04)', rMid:'rgba(0,48,135,.015)', edge:'rgba(0,48,135,.55)'
+  },
+  payment: {
+    colClass:'col-payment',
+    text:'#6b3800', line:'rgba(180,100,0,.38)', strong:'rgba(180,100,0,.72)',
+    soft:'rgba(180,100,0,.18)', fill:'rgba(196,167,71,.05)', cell:'rgba(196,167,71,.03)',
+    rCenter:'rgba(196,167,71,.05)', rMid:'rgba(196,167,71,.015)', edge:'rgba(180,100,0,.55)'
+  },
+  amount: {
+    colClass:'col-amount',
+    text:'#1f5b1f', line:'rgba(42,140,92,.18)', strong:'rgba(42,140,92,.34)',
+    soft:'rgba(42,140,92,.08)', fill:'rgba(42,140,92,.015)', cell:'rgba(42,140,92,.035)',
+    rCenter:'rgba(42,140,92,.04)', rMid:'rgba(42,140,92,.015)', edge:'rgba(42,140,92,.55)'
+  }
+};
+
+var activePill = null;
+
+function applyVars(el, cfg) {
+  ['text','line','strong','soft','fill','cell','edge'].forEach(function(k){
+    el.style.setProperty('--hl-'+k, cfg[k]);
+  });
+}
+
+function clearHighlights() {
+  document.querySelectorAll('.hl-hdr').forEach(function(el){
+    el.classList.remove('hl-hdr');
+    el.style.removeProperty('--hl-text');
+    el.style.removeProperty('--hl-line');
+    el.style.removeProperty('--hl-strong');
+    el.style.removeProperty('--hl-soft');
+    el.style.removeProperty('--hl-fill');
+    el.style.removeProperty('--hl-cell');
+    el.style.removeProperty('--hl-edge');
+  });
+  document.querySelectorAll('.hl-cell').forEach(function(el){
+    el.classList.remove('hl-cell');
+    el.style.removeProperty('--hl-text');
+    el.style.removeProperty('--hl-line');
+    el.style.removeProperty('--hl-strong');
+    el.style.removeProperty('--hl-soft');
+    el.style.removeProperty('--hl-fill');
+    el.style.removeProperty('--hl-cell');
+    el.style.removeProperty('--hl-edge');
+  });
+}
+
+function applyHighlight(pill) {
+  var cfg = PILL_CFG[pill];
+  if (!cfg) return;
+
+  document.querySelectorAll('th.' + cfg.colClass).forEach(function(th){
+    th.classList.add('hl-hdr');
+    applyVars(th, cfg);
+  });
+  document.querySelectorAll('td.' + cfg.colClass).forEach(function(td){
+    td.classList.add('hl-cell');
+    applyVars(td, cfg);
+  });
+
+  var firstTh = document.querySelector('th.' + cfg.colClass);
+  if (firstTh) {
+    var sa = document.getElementById('table-scroll-area');
+    var thR = firstTh.getBoundingClientRect();
+    var saR = sa.getBoundingClientRect();
+    if (thR.left < saR.left + 40 || thR.right > saR.right - 40) {
+      sa.scrollTo({ left: sa.scrollLeft + (thR.left - saR.left) - 60, behavior: 'smooth' });
+    }
+  }
+}
+
+function closeOverviewPanel(){
+  document.getElementById('overview-panel').classList.remove('open');
+  var ov=document.querySelector('.pill[data-pill="overview"]');
+  if(ov) ov.classList.remove('pill-on');
+}
+
+function toggleOverviewPill(el){
+  var panel=document.getElementById('overview-panel');
+  var isOpen=panel.classList.contains('open');
+  if(isOpen){
+    panel.classList.remove('open');
+    el.classList.remove('pill-on');
+  } else {
+    panel.classList.add('open');
+    el.classList.add('pill-on');
+  }
+}
+
+function startWalkthroughFromPill(el){
+  var wt=document.querySelector('.pill[data-pill="walkthrough"]');
+  if(wt) wt.classList.add('pill-on');
+  closeOverviewPanel();
+  openWalkthroughStep(0);
+}
+
+function togglePill(el) {
+  var p = el.getAttribute('data-pill');
+  if (activePill === p) {
+    el.classList.remove('pill-on');
+    clearHighlights();
+    activePill = null;
+    return;
+  }
+  if (activePill) {
+    var prev = document.querySelector('.pill[data-pill="' + activePill + '"]');
+    if (prev) prev.classList.remove('pill-on');
+    clearHighlights();
+  }
+  var wt=document.querySelector('.pill[data-pill="walkthrough"]');
+  if(wt) wt.classList.remove('pill-on');
+  closeOverviewPanel();
+  el.classList.add('pill-on');
+  activePill = p;
+  applyHighlight(p);
+}
+
+var sa=document.getElementById('table-scroll-area');
+
+// ── ARROW KEYS ──
+var PILL_ORDER=['overview','walkthrough','chartfield','who','amount'], pillBarVisible=false;
+function showPillBar(){document.getElementById('pill-bar').style.display='flex';pillBarVisible=true;}
+function hidePillBar(){document.getElementById('pill-bar').style.display='none';pillBarVisible=false;if(activePill){var prev=document.querySelector('.pill[data-pill="'+activePill+'"]');if(prev)prev.classList.remove('pill-on');clearHighlights();activePill=null;}}
+function navigatePill(dir){if(!pillBarVisible)return;var idx=activePill?PILL_ORDER.indexOf(activePill):-1,next=idx+dir;if(next<0)next=PILL_ORDER.length-1;if(next>=PILL_ORDER.length)next=0;var np=document.querySelector('.pill[data-pill="'+PILL_ORDER[next]+'"]');if(np)togglePill(np);}
+
+// ── FIELD GUIDE ──
+var EXPLANATIONS = {
+  bu:{ label:'GL Business Unit', what:'The GL Business Unit identifies the legal ledger that the transaction belongs to. In most cases here, that is COLUM for Columbia University.', interpret:'Read this as the top-level institutional bucket before you evaluate the rest of the chartstring.', why:'It confirms the transaction belongs to the correct University ledger and prevents you from mixing activity across different entities.', related:'Use with Account, Department, Project, and Fund to confirm you are reviewing the correct financial address.' },
+  fund:{ label:'Fund', what:'The Fund identifies the source or type of money being used, such as unrestricted, sponsored, gift, or other designated funds.', interpret:'Read this as the funding bucket. It answers what type of money is supporting the transaction.', why:'This is one of the most important compliance checks because the fund determines what rules, restrictions, and spending expectations may apply.', related:'Use with Project, Dept, and Account to understand both where the money came from and what it was used for.', glossary:`<div class="guide-pill-group"><button type="button" class="guide-pill-toggle" data-guide-target="fund-relevant"><span>Most relevant fund codes</span><span class="guide-pill-caret">▾</span></button><div class="guide-pill-panel" id="fund-relevant"><table class="glossary-table" style="margin-top:6px;"><tr><th>Fund</th><th>Name</th><th>What it means</th></tr><tr><td>01</td><td>General Unrestricted Fund</td><td>Core operating budget; flexible funds for general university business with no donor or sponsor restrictions.</td></tr><tr><td>20</td><td>Government Grant and Contract</td><td>Money from federal, state, or local government agencies for specific research or projects; highly regulated.</td></tr><tr><td>25</td><td>Private Grant and Contracts</td><td>Funding from private foundations, corporations, or non-profits for specific research or defined scopes of work.</td></tr><tr><td>30</td><td>Operating Gifts-UR</td><td>Donations that are unrestricted and available for general operational needs.</td></tr><tr><td>33</td><td>Operating Gifts-TR</td><td>Donations temporarily restricted by the donor for a specific purpose or time frame.</td></tr></table></div></div><div class="guide-pill-group"><button type="button" class="guide-pill-toggle" data-guide-target="fund-full"><span>Show full fund index</span><span class="guide-pill-caret">▾</span></button><div class="guide-pill-panel" id="fund-full"><table class="glossary-table" style="margin-top:6px;"><tr><th>Fund</th><th>Name</th><th>What it means</th></tr><tr><td>01</td><td>General Unrestricted Fund</td><td>Core operating budget; flexible funds for general university business with no donor or sponsor restrictions.</td></tr><tr><td>10</td><td>Patient Care</td><td>Revenue and expenses specifically related to clinical services and medical patient treatment.</td></tr><tr><td>20</td><td>Government Grant and Contract</td><td>Money from federal, state, or local government agencies for specific research or projects; highly regulated.</td></tr><tr><td>25</td><td>Private Grant and Contracts</td><td>Funding from private foundations, corporations, or non-profits for specific research or defined scopes of work.</td></tr><tr><td>30</td><td>Operating Gifts-UR</td><td>Donations that are unrestricted and available for general operational needs.</td></tr><tr><td>33</td><td>Operating Gifts-TR</td><td>Donations temporarily restricted by the donor for a specific purpose or time frame.</td></tr><tr><td>40</td><td>Endowment Principal-UR</td><td>The base amount of a gift intended to be held forever, with no restriction on field of study.</td></tr><tr><td>43</td><td>Endowment Principal-TR</td><td>The base amount of a gift held forever, restricted by the donor to a specific school, department, or purpose.</td></tr><tr><td>45</td><td>Endowment Principal-PR</td><td>Permanent Endowment principal where the corpus is strictly protected by specific legal or donor-imposed terms.</td></tr><tr><td>50</td><td>Endowment Appreciation-UR</td><td>The investment growth on an unrestricted endowment.</td></tr><tr><td>53</td><td>Endowment Appreciation-TR</td><td>The investment growth on a restricted endowment that must be used according to the donor's original intent.</td></tr><tr><td>55</td><td>Endowment Appreciation-PR</td><td>Accumulated gains on a permanently restricted gift subject to specific spending limitations.</td></tr><tr><td>60</td><td>Endowment Income-UR</td><td>The spendable interest or dividends generated by an unrestricted endowment pool.</td></tr><tr><td>63</td><td>Endowment Income-TR</td><td>The spendable interest or dividends that must be spent on a specific donor-mandated purpose.</td></tr><tr><td>70</td><td>University Loan Funds-UR</td><td>Internal university money set aside to provide loans to students or faculty.</td></tr><tr><td>73</td><td>Donor Created Loan Funds-TR</td><td>Money donated specifically to establish a loan program for a certain group.</td></tr><tr><td>75</td><td>Donor Created Loan Funds-PR</td><td>A permanent revolving loan fund where the principal must remain intact.</td></tr><tr><td>77</td><td>Federal Student Loan Funds</td><td>Capital provided by the federal government specifically for student financial aid loans.</td></tr><tr><td>80</td><td>Capital Projects - UR</td><td>Money used for building construction, renovations, or major equipment not donor-restricted.</td></tr><tr><td>82</td><td>Net Investment in Plant-UR</td><td>Represents the university's equity in its land, buildings, and equipment.</td></tr><tr><td>83</td><td>Net Investment in Plant-TR</td><td>Represents equity in buildings or assets that were funded by restricted sources or grants.</td></tr><tr><td>93</td><td>Capital Projects - TR</td><td>Funding for specific construction or renovation projects provided by a donor for that exact purpose.</td></tr></table></div></div>` },
+  account:{ label:'Account (Natural Account)', what:'The Account identifies what was purchased, paid, charged, or recorded. It is the natural classification of the transaction.', interpret:'This is the clearest answer to the question: what exactly is this transaction for? Natural accounts are 5 digits and the first number signals the major category, such as salaries, expenses, or transfers.', why:'This is one of the most important chartfields because it tells you the substance of the transaction in plain financial terms.', related:'Use with Account Description, Amount, Department, and Project to understand both the nature of the spend and where it belongs.', glossary:`<div class="guide-pill-group"><button type="button" class="guide-pill-toggle" data-guide-target="account-common"><span>Common accounts</span><span class="guide-pill-caret">▾</span></button><div class="guide-pill-panel" id="account-common"><table class="glossary-table" style="margin-top:6px;"><tr><th>Account</th><th>Account Description</th><th>Definition</th></tr><tr><td>61500</td><td>LAB SUPPLIES - GENERAL</td><td>Money spent on everyday laboratory supplies used for experiments or research.</td></tr><tr><td>61410</td><td>OFFICE SUPPLIES - GENERAL</td><td>Basic office supplies such as paper, pens, folders, or printer supplies.</td></tr><tr><td>65210</td><td>DOMESTIC TRANSPORTATION</td><td>Travel within the country such as taxis, trains, or rideshare.</td></tr><tr><td>65220</td><td>DOMESTIC MEALS</td><td>Meals purchased during business travel within the country.</td></tr><tr><td>65230</td><td>DOMESTIC LODGING</td><td>Hotel expenses during domestic business travel.</td></tr><tr><td>61405</td><td>SUPPLIES AND MATERIALS - GENERAL</td><td>General supplies used for office work, research, or operations.</td></tr><tr><td>64350</td><td>MEETINGS AND EVENTS</td><td>Costs for hosting meetings, seminars, workshops, or events.</td></tr><tr><td>65310</td><td>INTERNATIONAL TRANSPORTATION</td><td>Airfare or travel costs for trips outside the country.</td></tr><tr><td>66475</td><td>TRAVEL - SEGREGATED</td><td>Travel expenses kept separate for special tracking or reporting.</td></tr><tr><td>53300</td><td>OFFICER OF ADMIN</td><td>Salaries paid to Officers of Administration.</td></tr></table></div></div><div class="guide-pill-group"><button type="button" class="guide-pill-toggle" data-guide-target="account-more"><span>Show more common accounts</span><span class="guide-pill-caret">▾</span></button><div class="guide-pill-panel" id="account-more"><table class="glossary-table" style="margin-top:6px;"><tr><th>Account</th><th>Account Description</th><th>Definition</th></tr><tr><td>52810</td><td>GRA (SUBJECT TO TUITION)</td><td>Salary or stipend paid to a Graduate Research Assistant whose tuition is also charged to the project or department.</td></tr><tr><td>54410</td><td>STUDENT CASUALS (FT)</td><td>Wages paid to full-time student employees working temporary or hourly jobs.</td></tr><tr><td>64005</td><td>SERVICES - GENERAL</td><td>Payments for general services performed by vendors.</td></tr><tr><td>65020</td><td>SUBCONTRACTS OUT OF MTDC</td><td>Payments to other institutions working on a sponsored research project.</td></tr><tr><td>64505</td><td>CONSULTANTS - GENERAL</td><td>Payments made to outside experts hired to provide advice or specialized professional services.</td></tr><tr><td>64540</td><td>MARKETING CONSULTANTS</td><td>Payments to consultants who help with marketing strategy, branding, communications, or promotion.</td></tr><tr><td>64305</td><td>PHOTOGRAPHIC SERVICE</td><td>Payments for professional photography services, such as event photos or marketing images.</td></tr><tr><td>61010</td><td>UNDERGRAD TUITION, FEES, ROOM,</td><td>Charges related to undergraduate student tuition and housing.</td></tr><tr><td>64110</td><td>LAB SERVICES</td><td>Payments for laboratory testing or services performed by others.</td></tr><tr><td>65330</td><td>INTERNATIONAL LODGING</td><td>Hotel expenses during international business travel.</td></tr><tr><td>61690</td><td>FOOD - STAFF &amp; FACULTY</td><td>Food purchased for staff or faculty meetings or work events.</td></tr><tr><td>65320</td><td>INTERNATIONAL MEALS</td><td>Meals during international business travel.</td></tr><tr><td>61910</td><td>MINOR EQUIPMENT - GENERAL</td><td>Purchase of small equipment that is not large enough to be considered capital equipment.</td></tr><tr><td>69042</td><td>RECOVERY - LAB SERVICES</td><td>Revenue or cost recovery for laboratory services provided.</td></tr><tr><td>63450</td><td>FREIGHT &amp; PARCEL SHIPPING</td><td>Costs for shipping packages or equipment.</td></tr><tr><td>64365</td><td>CONFERENCE FEES</td><td>Registration fees to attend conferences or professional meetings.</td></tr><tr><td>61095</td><td>FIN AID - SEMESTER SPLIT</td><td>Financial aid adjustments split across academic terms.</td></tr><tr><td>64055</td><td>CU FACILITIES CHARGEABLE WORK</td><td>Payments for facilities work performed by Columbia Facilities.</td></tr><tr><td>61925</td><td>MINOR EQUIPMENT - COMPUTERS</td><td>Purchase of smaller computer equipment like laptops or monitors.</td></tr><tr><td>68100</td><td>R&amp;D COMPONENT PARTS - CAPITAL</td><td>Parts purchased for building research equipment that will become capital equipment.</td></tr><tr><td>64330</td><td>SUBSCRIPTIONS</td><td>Payments for journals, software subscriptions, or memberships.</td></tr><tr><td>61160</td><td>GRA TUITION - DIRECT CHARGE</td><td>Tuition charged to a research grant for a graduate research assistant.</td></tr><tr><td>64150</td><td>OFFICE SERVICES - GENERAL</td><td>Payments for office-related services like printing or copying.</td></tr><tr><td>63280</td><td>WEB EXPENSES</td><td>Costs for website hosting, maintenance, or digital services.</td></tr><tr><td>66410</td><td>ALCOHOLIC BEVERAGES</td><td>Purchase of alcoholic beverages for approved events.</td></tr></table></details>` },
+  account_desc:{ label:'Account Description', what:'The plain-language description of the Account code.', interpret:'This gives you the readable explanation of the account category without needing to memorize numeric account codes.', why:'It improves accuracy and speeds up review by helping users quickly validate the nature of the transaction.', related:'Paired directly with Account and useful alongside Amount, Voucher Comments, and Transaction Description / Vendor Name.' },
+  dept:{ label:'Department', what:'The Department identifies the academic or administrative unit that owns and is responsible for the transaction.', interpret:'Read this as the organizational owner. It answers who is accountable for the transaction.', why:'Department drives responsibility, reporting, and review. At Columbia Engineering, department values typically begin with 52 and identify the school, division, and specific office or unit.', related:'Use with Department Description, Account, Project, and Initiative to understand who owns the activity and why it was charged there.', glossary:`<div class="glossary-title">Department hierarchy — Columbia Engineering</div><div class="dept-hierarchy-wrap"><div class="dept-hierarchy-head">ENG Department Hierarchy</div><div class="dept-hierarchy-sub">School: <b>ENG Engineering</b>. All department numbers are grouped below by division and subdivision so you can trace ownership from top level to exact accountable unit.</div><div class="guide-pill-group"><button type="button" class="guide-pill-toggle" data-guide-target="dept-admin" class="guide-pill-toggle dept-admin-pill"><span>ENG Administration</span><span class="guide-pill-caret">▾</span></button><div class="guide-pill-panel" id="dept-admin"><table class="glossary-table" style="margin-top:6px;"><tr><th>Group</th><th>Department</th><th>Description</th></tr><tr><td>52010XX</td><td>5201101</td><td>ENG General</td></tr><tr><td>52020XX</td><td>5202102</td><td>ENG Dean's Office</td></tr><tr><td>52020XX</td><td>5202103</td><td>ENG Communications</td></tr><tr><td>52020XX</td><td>5202104</td><td>ENG Strategic Initiatives</td></tr><tr><td>52020XX</td><td>5202105</td><td>ENG CVN</td></tr><tr><td>52020XX</td><td>5202106</td><td>ENG Advancement</td></tr><tr><td>52020XX</td><td>5202107</td><td>ENG Faculty Affairs</td></tr><tr><td>52020XX</td><td>5202108</td><td>ENG Finance &amp; Admin</td></tr><tr><td>52020XX</td><td>5202109</td><td>ENG Graduate Student Services</td></tr><tr><td>52020XX</td><td>5202110</td><td>ENG Human Resources</td></tr><tr><td>52020XX</td><td>5202111</td><td>ENG Prof &amp; Executive Prgms</td></tr><tr><td>52020XX</td><td>5202112</td><td>ENG Research Admin</td></tr><tr><td>52020XX</td><td>5202113</td><td>ENG Undergraduate Affairs</td></tr><tr><td>52020XX</td><td>5202114</td><td>ENG Facilities</td></tr><tr><td>52020XX</td><td>5202115</td><td>ENG Information Technology</td></tr><tr><td>52020XX</td><td>5202116</td><td>ENG Office of Academic Program</td></tr></table></div></div><div class="guide-pill-group"><button type="button" class="guide-pill-toggle" data-guide-target="dept-academic" class="guide-pill-toggle dept-academic-pill"><span>ENG Academic Departments</span><span class="guide-pill-caret">▾</span></button><div class="guide-pill-panel" id="dept-academic"><div class="guide-pill-group"><button type="button" class="guide-pill-toggle" data-guide-target="dept-apam" class="guide-pill-toggle dept-subpill"><span>APAM — Applied Physics &amp; Applied Math (52100XX)</span><span class="guide-pill-caret">▾</span></button><div class="guide-pill-panel" id="dept-apam"><table class="glossary-table" style="margin-top:6px;"><tr><th>Department</th><th>Description</th></tr><tr><td>5210101</td><td>ENG APAM General</td></tr><tr><td>5210102</td><td>ENG APAM Faculty</td></tr><tr><td>5210104</td><td>ENG APAM Research</td></tr><tr><td>5210105</td><td>ENG APAM Centers</td></tr></table></div></div><div class="guide-pill-group"><button type="button" class="guide-pill-toggle" data-guide-target="dept-msae" class="guide-pill-toggle dept-subpill"><span>MSAE — Materials Science (52102XX)</span><span class="guide-pill-caret">▾</span></button><div class="guide-pill-panel" id="dept-msae"><table class="glossary-table" style="margin-top:6px;"><tr><th>Department</th><th>Description</th></tr><tr><td>5210201</td><td>ENG MSAE General</td></tr><tr><td>5210202</td><td>ENG MSAE Faculty</td></tr><tr><td>5210204</td><td>ENG MSAE Research</td></tr><tr><td>5210205</td><td>ENG MSAE Centers</td></tr></table></div></div><div class="guide-pill-group"><button type="button" class="guide-pill-toggle" data-guide-target="dept-chen" class="guide-pill-toggle dept-subpill"><span>CHEN — Chemical Engineering (52110XX)</span><span class="guide-pill-caret">▾</span></button><div class="guide-pill-panel" id="dept-chen"><table class="glossary-table" style="margin-top:6px;"><tr><th>Department</th><th>Description</th></tr><tr><td>5211101</td><td>ENG CHEN General</td></tr><tr><td>5211102</td><td>ENG CHEN Faculty</td></tr><tr><td>5211104</td><td>ENG CHEN Research</td></tr><tr><td>5211105</td><td>ENG CHEN Centers</td></tr></table></div></div><div class="guide-pill-group"><button type="button" class="guide-pill-toggle" data-guide-target="dept-ceem" class="guide-pill-toggle dept-subpill"><span>CEEM — Civil Engineering &amp; Engineering Mechanics (52120XX)</span><span class="guide-pill-caret">▾</span></button><div class="guide-pill-panel" id="dept-ceem"><table class="glossary-table" style="margin-top:6px;"><tr><th>Department</th><th>Description</th></tr><tr><td>5212101</td><td>ENG CEEM General</td></tr><tr><td>5212102</td><td>ENG CEEM Faculty</td></tr><tr><td>5212104</td><td>ENG CEEM Research</td></tr><tr><td>5212105</td><td>ENG CEEM Centers</td></tr></table></div></div><div class="guide-pill-group"><button type="button" class="guide-pill-toggle" data-guide-target="dept-coms" class="guide-pill-toggle dept-subpill"><span>COMS — Computer Science (52130XX)</span><span class="guide-pill-caret">▾</span></button><div class="guide-pill-panel" id="dept-coms"><table class="glossary-table" style="margin-top:6px;"><tr><th>Department</th><th>Description</th></tr><tr><td>5213101</td><td>ENG COMS General</td></tr><tr><td>5213102</td><td>ENG COMS Faculty</td></tr><tr><td>5213104</td><td>ENG COMS Research</td></tr><tr><td>5213105</td><td>ENG COMS Centers</td></tr></table></div></div><div class="guide-pill-group"><button type="button" class="guide-pill-toggle" data-guide-target="dept-elen" class="guide-pill-toggle dept-subpill"><span>ELEN — Electrical Engineering (52140XX)</span><span class="guide-pill-caret">▾</span></button><div class="guide-pill-panel" id="dept-elen"><table class="glossary-table" style="margin-top:6px;"><tr><th>Department</th><th>Description</th></tr><tr><td>5214101</td><td>ENG ELEN General</td></tr><tr><td>5214102</td><td>ENG ELEN Faculty</td></tr><tr><td>5214104</td><td>ENG ELEN Research</td></tr><tr><td>5214105</td><td>ENG ELEN Centers</td></tr></table></div></div><div class="guide-pill-group"><button type="button" class="guide-pill-toggle" data-guide-target="dept-ieor" class="guide-pill-toggle dept-subpill"><span>IEOR — Industrial Engineering &amp; Operations Research (52150XX)</span><span class="guide-pill-caret">▾</span></button><div class="guide-pill-panel" id="dept-ieor"><table class="glossary-table" style="margin-top:6px;"><tr><th>Department</th><th>Description</th></tr><tr><td>5215101</td><td>ENG IEOR General</td></tr><tr><td>5215102</td><td>ENG IEOR Faculty</td></tr><tr><td>5215104</td><td>ENG IEOR Research</td></tr><tr><td>5215105</td><td>ENG IEOR Centers</td></tr></table></div></div><div class="guide-pill-group"><button type="button" class="guide-pill-toggle" data-guide-target="dept-mece" class="guide-pill-toggle dept-subpill"><span>MECE — Mechanical Engineering (52160XX)</span><span class="guide-pill-caret">▾</span></button><div class="guide-pill-panel" id="dept-mece"><table class="glossary-table" style="margin-top:6px;"><tr><th>Department</th><th>Description</th></tr><tr><td>5216101</td><td>ENG MECE General</td></tr><tr><td>5216102</td><td>ENG MECE Faculty</td></tr><tr><td>5216104</td><td>ENG MECE Research</td></tr><tr><td>5216105</td><td>ENG MECE Centers</td></tr></table></div></div><div class="guide-pill-group"><button type="button" class="guide-pill-toggle" data-guide-target="dept-eaee" class="guide-pill-toggle dept-subpill"><span>EAEE — Earth &amp; Environmental Engineering (52170XX)</span><span class="guide-pill-caret">▾</span></button><div class="guide-pill-panel" id="dept-eaee"><table class="glossary-table" style="margin-top:6px;"><tr><th>Department</th><th>Description</th></tr><tr><td>5217101</td><td>ENG EAEE General</td></tr><tr><td>5217102</td><td>ENG EAEE Faculty</td></tr><tr><td>5217104</td><td>ENG EAEE Research</td></tr><tr><td>5217105</td><td>ENG EAEE Centers</td></tr></table></div></div><div class="guide-pill-group"><button type="button" class="guide-pill-toggle" data-guide-target="dept-bmen" class="guide-pill-toggle dept-subpill"><span>BMEN — Biomedical Engineering (52180XX)</span><span class="guide-pill-caret">▾</span></button><div class="guide-pill-panel" id="dept-bmen"><table class="glossary-table" style="margin-top:6px;"><tr><th>Department</th><th>Description</th></tr><tr><td>5218101</td><td>ENG BMEN General</td></tr><tr><td>5218102</td><td>ENG BMEN Faculty</td></tr><tr><td>5218104</td><td>ENG BMEN Research</td></tr><tr><td>5218105</td><td>ENG BMEN Centers</td></tr><tr><td>5218201</td><td>Prof Vunjak-Novakovic Lab</td></tr><tr><td>5218202</td><td>Prof Elisa Konofagou Lab</td></tr><tr><td>5218203</td><td>Prof Kam Leong Lab</td></tr><tr><td>5218204</td><td>Prof Sam Sia Lab</td></tr><tr><td>5218205</td><td>Prof Tal Danino Lab</td></tr><tr><td>5218206</td><td>Prof Arinzeh Lab</td></tr><tr><td>5218207</td><td>Santiago Correa Lab</td></tr><tr><td>5218208</td><td>Nuttida Rungratsameeta Lab</td></tr><tr><td>5218209</td><td>Prof Christoph Juchem Lab</td></tr><tr><td>5218210</td><td>Prof Joshua Jacobs Lab</td></tr><tr><td>5218211</td><td>Prof Qi Wang Lab</td></tr><tr><td>5218212</td><td>Prof Paul Sajda Lab</td></tr><tr><td>5218213</td><td>Prof Sanja Vickovic Lab</td></tr><tr><td>5218214</td><td>Prof Ke Cheng Lab</td></tr><tr><td>5218215</td><td>Prof Grace McIlvain</td></tr><tr><td>5218216</td><td>Prof Clark Hung Lab</td></tr><tr><td>5218217</td><td>Prof Elizabeth Hillman Lab</td></tr><tr><td>5218218</td><td>Prof Elham Azizi Lab</td></tr></table></div></div></div></div><div class="guide-pill-group"><button type="button" class="guide-pill-toggle" data-guide-target="dept-centers" class="guide-pill-toggle dept-centers-pill"><span>ENG Centers &amp; Institutes</span><span class="guide-pill-caret">▾</span></button><div class="guide-pill-panel" id="dept-centers"><div class="guide-pill-group"><button type="button" class="guide-pill-toggle" data-guide-target="dept-cni" class="guide-pill-toggle dept-subpill"><span>CNI &amp; CCLS (52601XX–52602XX)</span><span class="guide-pill-caret">▾</span></button><div class="guide-pill-panel" id="dept-cni"><table class="glossary-table" style="margin-top:6px;"><tr><th>Department</th><th>Description</th></tr><tr><td>5260101</td><td>ENG CNI General</td></tr><tr><td>5260102</td><td>ENG CNI Academic RO</td></tr><tr><td>5260104</td><td>ENG CNI Research</td></tr><tr><td>5260201</td><td>ENG CCLS General</td></tr><tr><td>5260202</td><td>ENG CCLS Academic RO</td></tr><tr><td>5260204</td><td>ENG CCLS Research</td></tr></table></div></div><div class="guide-pill-group"><button type="button" class="guide-pill-toggle" data-guide-target="dept-giss" class="guide-pill-toggle dept-subpill"><span>APAM GISS &amp; Data Science (52603XX–52604XX)</span><span class="guide-pill-caret">▾</span></button><div class="guide-pill-panel" id="dept-giss"><table class="glossary-table" style="margin-top:6px;"><tr><th>Department</th><th>Description</th></tr><tr><td>5260301</td><td>ENG APAM GISS General</td></tr><tr><td>5260302</td><td>ENG APAM GISS Academic RO</td></tr><tr><td>5260303</td><td>ENG APAM GISS Research</td></tr><tr><td>5260401</td><td>ENG DATA SCIENCE General</td></tr><tr><td>5260402</td><td>ENG DATA SCIENCE Academic RO</td></tr><tr><td>5260404</td><td>ENG DATA SCIENCE Research</td></tr></table></div></div><div class="guide-pill-group"><button type="button" class="guide-pill-toggle" data-guide-target="dept-innovation" class="guide-pill-toggle dept-subpill"><span>Innovation Centers (52605XX)</span><span class="guide-pill-caret">▾</span></button><div class="guide-pill-panel" id="dept-innovation"><table class="glossary-table" style="margin-top:6px;"><tr><th>Department</th><th>Description</th></tr><tr><td>5260501</td><td>ENG LEAP Center</td></tr><tr><td>5260502</td><td>ENG Center for Smart Streetscapes</td></tr><tr><td>5260503</td><td>ENG DREAM Sports AI Innovation</td></tr><tr><td>5260504</td><td>ENG Advanced Electrification</td></tr><tr><td>5260505</td><td>ENG Columbia Fusion Research Ctr</td></tr><tr><td>5260506</td><td>ENG CU Ethereum Research Center</td></tr></table></div></div></div></div></div>` },
+  dept_desc:{ label:'Department Description', what:'The readable name of the Department code.', interpret:'This field translates the department code into the actual department name.', why:'It helps users validate the owning unit quickly and makes reports easier to review and explain.', related:'Paired directly with Dept and useful when sorting or filtering transactions by organizational ownership.' },
+  project:{ label:'Project', what:'The Project identifies the specific initiative, award, or temporary effort the transaction belongs to.', interpret:'This answers which project or award the transaction is tied to. Project values are typically 8 characters and often begin with prefixes such as UR, GG, PG, GT, EN, or CP.', why:'Project is essential for grouping financial activity under one defined effort, whether unrestricted, gift-funded, endowment-related, capital, or sponsored.', related:'Use with Activity, Initiative, Department, and Fund to understand both the purpose of the work and the type of support behind it.' },
+  project_desc:{ label:'Project Description', what:'The readable title or description of the Project code.', interpret:'This explains what the project is in plain language.', why:'It helps validate that the transaction was charged to the intended project and makes project review easier for nontechnical users.', related:'Paired directly with Project and useful alongside Activity, Fund, and Amount.' },
+  activity:{ label:'Activity', what:'The Activity chartfield is used to organize different scopes of work within the same project.', interpret:'Read this as which part of the overall project the expense supports. Activities usually separate work by function, research aim, deliverable, or internal scope rather than simply by person.', why:'Activity helps departments and principal investigators track spend within a project more precisely, such as by workstream, lab effort, modeling, or project leadership.', related:'Use with Project, Initiative, Segment, and Amount to understand which portion of the project absorbed the expense.' },
+  activity_desc:{ label:'Activity Description', what:'The readable description of the Activity code.', interpret:'This tells you what that activity segment means within the project.', why:'It helps reviewers distinguish between different parts of the same project and supports more precise reporting and reconciliation.', related:'Paired directly with Activity and best read with Project Description.' },
+  initiative:{ label:'Initiative', what:'The Initiative chartfield categorizes the transaction by institutional or school-wide purpose.', interpret:'This answers what broader purpose the activity supports, such as administration, education, or research.', why:'Initiative allows Columbia Engineering to analyze transactions across departments and projects using a common purpose-based lens.', related:'Use with Project, Activity, Segment, and Department when you need to understand the higher-level purpose behind the charge.', glossary:`<div class="guide-pill-group"><button type="button" class="guide-pill-toggle" data-guide-target="initiative-common"><span>Common initiatives</span><span class="guide-pill-caret">▾</span></button><div class="guide-pill-panel" id="initiative-common"><table class="glossary-table" style="margin-top:6px;"><tr><th>Initiative</th><th>Initiative Description</th><th>Definition</th></tr><tr><td>60908</td><td>ENG Specific Research</td><td>Funding used for specific engineering research projects or initiatives.</td></tr><tr><td>60909</td><td>ENG Start-up</td><td>Funds provided to new faculty to help launch their research labs and programs.</td></tr><tr><td>29214</td><td>ENG Dept General Operations</td><td>General operating expenses used to support department activities.</td></tr><tr><td>41814</td><td>ENG Faculty Discretionary</td><td>Funds faculty can use for academic or research-related needs at their discretion.</td></tr><tr><td>41809</td><td>ENG Undergraduate Academic</td><td>Expenses supporting undergraduate academic programs and coursework.</td></tr><tr><td>40096</td><td>ENG Summer Salary Costs</td><td>Salary paid to faculty for work performed during the summer period.</td></tr><tr><td>10001</td><td>Payroll Suspense</td><td>Temporary account used when payroll expenses need to be reviewed or reassigned.</td></tr><tr><td>29223</td><td>ENG Student Recruitment</td><td>Expenses used to attract and recruit new students to engineering programs.</td></tr><tr><td>41804</td><td>ENG Graduate Activities</td><td>Programs, events, or services supporting graduate student life.</td></tr><tr><td>60025</td><td>GEN RES Stabilization Awards</td><td>Funding used to stabilize or support research programs during funding gaps.</td></tr></table></div></div><div class="guide-pill-group"><button type="button" class="guide-pill-toggle" data-guide-target="initiative-more"><span>Show more common initiatives</span><span class="guide-pill-caret">▾</span></button><div class="guide-pill-panel" id="initiative-more"><table class="glossary-table" style="margin-top:6px;"><tr><th>Initiative</th><th>Initiative Description</th><th>Definition</th></tr><tr><td>60910</td><td>ENG SEAS Inter. Res. Seed Fund</td><td>Seed funding to support new interdisciplinary research ideas in engineering.</td></tr><tr><td>60900</td><td>ENG Deans Research Support</td><td>Funding from the Dean’s Office to support faculty research initiatives.</td></tr><tr><td>41826</td><td>ENG Student Clubs</td><td>Support for student-led clubs and extracurricular organizations.</td></tr><tr><td>41802</td><td>ENG Conferences</td><td>Costs related to hosting or supporting academic conferences.</td></tr><tr><td>41803</td><td>ENG Graduate Academic</td><td>Expenses supporting graduate academic programs and instruction.</td></tr><tr><td>41816</td><td>ENG Fellowship Support</td><td>Funding used to support student fellowships or stipends.</td></tr><tr><td>41808</td><td>ENG Teaching assistants</td><td>Support for graduate teaching assistants helping with courses.</td></tr><tr><td>41815</td><td>ENG Professorships</td><td>Funds supporting endowed or named faculty professorship positions.</td></tr><tr><td>41821</td><td>ENG Orientation</td><td>Costs related to student orientation programs.</td></tr><tr><td>41817</td><td>ENG High School Programs</td><td>Programs designed for high school students engaging with engineering.</td></tr><tr><td>29205</td><td>ENG Graduate Admissions</td><td>Expenses related to the graduate admissions process.</td></tr><tr><td>29216</td><td>ENG Special Event</td><td>Costs for special events hosted by engineering departments or programs.</td></tr><tr><td>60901</td><td>ENG Dept Research Support</td><td>Department-level support for faculty research activities.</td></tr><tr><td>29220</td><td>ENG Fundraising</td><td>Activities related to fundraising and development efforts.</td></tr><tr><td>29210</td><td>ENG Renovations and Repairs</td><td>Expenses for repairing or renovating department spaces or facilities.</td></tr><tr><td>40511</td><td>ENG Faculty Support - General</td><td>General support funding for faculty activities or needs.</td></tr><tr><td>41810</td><td>ENG Undergraduate Activities</td><td>Programs, events, or initiatives supporting undergraduate students.</td></tr></table></details>` },
+  initiative_desc:{ label:'Initiative Description', what:'The plain-language explanation of the Initiative code.', interpret:'This tells you what the initiative tag actually represents.', why:'It makes reporting and review much easier, especially when initiative codes are not self-explanatory.', related:'Paired directly with Initiative and useful when summarizing transactions across projects or units.' },
+  segment:{ label:'Segment', what:'The Segment chartfield adds more specific context about who or what the activity is associated with.', interpret:'Read this as the precision layer of the chartstring. It may point to a person, role, program component, student group, event, or other focused business use.', why:'Segment improves reporting detail and helps distinguish similar transactions that otherwise share the same department, project, and initiative.', related:'Use with Initiative, Activity, Department, and Site to understand the exact business context of the expense.', glossary:`<div class="guide-pill-group"><button type="button" class="guide-pill-toggle" data-guide-target="segment-common"><span>Common segments</span><span class="guide-pill-caret">▾</span></button><div class="guide-pill-panel" id="segment-common"><table class="glossary-table" style="margin-top:6px;"><tr><th>Segment</th><th>Segment Description</th><th>Definition</th></tr><tr><td>52000167</td><td>ENG Staff General</td><td>Funding used for general staff-related expenses within Engineering.</td></tr><tr><td>52000048</td><td>ENG Student</td><td>Funding supporting general student-related activities or expenses.</td></tr><tr><td>52000020</td><td>ENG Financial Aid Gen</td><td>Funds used to support general student financial aid.</td></tr><tr><td>52000026</td><td>ENG Teaching Lab</td><td>Expenses related to teaching laboratories used for courses.</td></tr><tr><td>52000102</td><td>ENG Staff Meeting</td><td>Costs associated with meetings for departmental staff.</td></tr><tr><td>52000070</td><td>ENG PHD</td><td>Activities or expenses related to PhD students or doctoral programs.</td></tr><tr><td>52000071</td><td>ENG Faculty</td><td>Funding supporting faculty-related expenses or activities.</td></tr><tr><td>52000069</td><td>ENG Masters</td><td>Expenses related to master's degree programs.</td></tr><tr><td>52000121</td><td>ENG Course Assistant</td><td>Support for course assistants who help with instruction.</td></tr><tr><td>52000016</td><td>ENG Undergraduate - other</td><td>Miscellaneous expenses supporting undergraduate programs.</td></tr></table></div></div><div class="guide-pill-group"><button type="button" class="guide-pill-toggle" data-guide-target="segment-more"><span>Show more common segments</span><span class="guide-pill-caret">▾</span></button><div class="guide-pill-panel" id="segment-more"><table class="glossary-table" style="margin-top:6px;"><tr><th>Segment</th><th>Segment Description</th><th>Definition</th></tr><tr><td>52000098</td><td>ENG Technology</td><td>Expenses related to technology resources or initiatives.</td></tr><tr><td>52000150</td><td>ENG Faculty Meeting</td><td>Costs associated with faculty meetings.</td></tr><tr><td>52000188</td><td>ENG Career Placement &amp; Develop</td><td>Programs supporting student career placement and professional development.</td></tr><tr><td>52000049</td><td>ENG Graduation</td><td>Expenses supporting engineering graduation ceremonies and related events.</td></tr><tr><td>52000139</td><td>ENG O/D Funding</td><td>Funding used for special or one-time departmental support or discretionary funding.</td></tr><tr><td>52000316</td><td>ENG Barnard</td><td>Expenses related to programs or collaboration involving Barnard College.</td></tr><tr><td>52000117</td><td>ENG ISSO Fees</td><td>Fees associated with international student services and visa administration.</td></tr><tr><td>52000140</td><td>ENG Student Office Refresher</td><td>Costs for refreshments or supplies for student-facing office spaces or events.</td></tr><tr><td>52000128</td><td>ENG Lab refresher</td><td>Refreshments or small supplies provided for laboratory meetings or activities.</td></tr><tr><td>52000059</td><td>ENG Executive Meeting</td><td>Expenses related to meetings of engineering leadership or executive staff.</td></tr><tr><td>52000229</td><td>ENG Makerspace</td><td>Funding supporting makerspace labs used for student projects and prototyping.</td></tr><tr><td>52000001</td><td>ENG Admissions</td><td>Expenses related to recruiting and admitting new engineering students.</td></tr></table></details>` },
+  segment_desc:{ label:'Segment Description', what:'The readable description of the Segment code.', interpret:'This explains what the segment classification represents in plain language.', why:'It helps users understand why the segment was used and what reporting purpose it serves.', related:'Paired directly with Segment and useful with Initiative and Project.' },
+  site:{ label:'Site', what:'The Site chartfield identifies the physical or operational location associated with the transaction.', interpret:'This answers where the activity is happening, whether on a campus, in a facility, or at another geographic location.', why:'Site supports location-based reporting and helps leadership understand where University resources are being used across campuses and operations.', related:'Use with Department, Segment, Initiative, and Function when place or location matters to the analysis.' },
+  site_desc:{ label:'Site Description', what:'The readable name of the Site code.', interpret:'This translates the site code into an actual location or site name.', why:'It makes the location context easier to understand during review and reporting.', related:'Paired directly with Site.' },
+  function:{ label:'Function', what:'The Function chartfield classifies the transaction by type of institutional activity, such as instruction, research, student services, institutional support, public service, or operations.', interpret:'This answers what kind of institutional mission or reporting category the transaction supports.', why:'Function is critical for higher-education financial reporting because it groups spending by purpose, not just by department or project.', related:'Use with Department, Initiative, Fund, and Project to connect the transaction to the University activity it supports.', glossary:`<div class="guide-pill-group"><button type="button" class="guide-pill-toggle" data-guide-target="function-relevant"><span>Most relevant function codes</span><span class="guide-pill-caret">▾</span></button><div class="guide-pill-panel" id="function-relevant"><table class="glossary-table" style="margin-top:6px;"><tr><th>Code</th><th>Description</th><th>What it means</th></tr><tr><td>200</td><td>Instruction &amp; Faculty Support</td><td>Costs related to teaching, academic programs, and faculty support activities.</td></tr><tr><td>215</td><td>General &amp; Financial Admin</td><td>Costs associated with university leadership, finance, and administrative operations.</td></tr><tr><td>235</td><td>Department Research</td><td>Research conducted within departments not tied to a specific sponsored grant.</td></tr><tr><td>250</td><td>Organized Research</td><td>Research projects that are formally funded and organized, often through grants or contracts.</td></tr><tr><td>305</td><td>Ops &amp; Maintenance of Plant</td><td>Costs related to maintaining university buildings and facilities.</td></tr></table></div></div><div class="guide-pill-group"><button type="button" class="guide-pill-toggle" data-guide-target="function-full"><span>Show full function index</span><span class="guide-pill-caret">▾</span></button><div class="guide-pill-panel" id="function-full"><table class="glossary-table" style="margin-top:6px;"><tr><th>Code</th><th>Description</th><th>What it means</th></tr><tr><td>010</td><td>Tuition</td><td>Money received from student tuition payments</td></tr><tr><td>020</td><td>Fees</td><td>Money received from student fees or service charges</td></tr><tr><td>030</td><td>Financial Aid Grants</td><td>Money given to students as financial aid that does not need to be repaid</td></tr><tr><td>040</td><td>Gov't Grants &amp; Cont - Direct</td><td>Research funding received directly from government agencies to support specific research projects</td></tr><tr><td>050</td><td>Gov't Grants &amp; Cont - Indirect</td><td>Indirect cost recovery from government-funded research projects</td></tr><tr><td>060</td><td>Gifts</td><td>Donations given to the university by individuals, foundations, or organizations</td></tr><tr><td>070</td><td>Private Grants &amp; Cont - Direct</td><td>Research funding from private organizations or foundations used directly for research projects</td></tr><tr><td>080</td><td>Private Grants &amp; Cont - Indirect</td><td>Indirect cost recovery from privately funded research projects</td></tr><tr><td>090</td><td>Patent and License</td><td>Revenue earned from licensing university inventions, patents, or intellectual property</td></tr><tr><td>095</td><td>Other Educational Activities</td><td>Revenue or expenses related to educational programs outside regular instruction</td></tr><tr><td>170</td><td>Endowment Income Distributed</td><td>Income distributed from endowment investments to support university operations</td></tr><tr><td>175</td><td>Other Investment Income</td><td>Income generated from investments other than endowment distributions</td></tr><tr><td>180</td><td>Sales and Services of Aux Ent</td><td>Revenue from auxiliary services, such as housing, dining, or other campus services</td></tr><tr><td>190</td><td>Release from Restriction</td><td>Funds previously restricted but now available to spend for their intended purpose</td></tr><tr><td>200</td><td>Instruction &amp; Faculty Support</td><td>Costs related to teaching, academic programs, and faculty support activities</td></tr><tr><td>205</td><td>Student Services</td><td>Costs related to supporting students, such as advising, counseling, and student activities</td></tr><tr><td>210</td><td>External Affairs &amp; Fundraising</td><td>Expenses related to fundraising, alumni relations, and external partnerships</td></tr><tr><td>215</td><td>General &amp; Financial Admin</td><td>Costs associated with university leadership, finance, and administrative operations</td></tr><tr><td>226</td><td>Other Instruction &amp; Edu Adm</td><td>Administrative activities that support academic programs and instruction</td></tr><tr><td>230</td><td>Other Sponsored Training</td><td>Training programs funded by external sponsors</td></tr><tr><td>235</td><td>Department Research</td><td>Research conducted within departments not tied to a specific sponsored grant</td></tr><tr><td>240</td><td>Public Service</td><td>Activities that provide services or benefits to the public outside the university</td></tr><tr><td>250</td><td>Organized Research</td><td>Research projects that are formally funded and organized, often through grants or contracts</td></tr><tr><td>255</td><td>Sponsored Research Training</td><td>Training programs that are funded through sponsored research awards</td></tr><tr><td>305</td><td>Ops &amp; Maintenance of Plant</td><td>Costs related to maintaining university buildings and facilities</td></tr><tr><td>320</td><td>Institutional Support</td><td>Administrative services that support the overall operation of the university</td></tr><tr><td>330</td><td>Debt Service</td><td>Payments related to university borrowing or financing obligations</td></tr><tr><td>335</td><td>Major Equipment</td><td>Spending on large equipment purchases used for research or operations</td></tr><tr><td>370</td><td>F&amp;A Expense - Government</td><td>Facilities and administrative costs associated with government-sponsored research</td></tr><tr><td>371</td><td>F&amp;A Expense - Private</td><td>Facilities and administrative costs associated with privately sponsored research</td></tr><tr><td>509</td><td>Reclassification</td><td>Adjustments made to correct or reassign financial transactions</td></tr><tr><td>600</td><td>IS - Common Cost</td><td>Shared administrative costs allocated across multiple departments</td></tr><tr><td>633</td><td>IS - MOT from Transactions</td><td>Charges related to internal services, facility use, or institutional adjustments</td></tr><tr><td>640</td><td>IS - General Transfers</td><td>Transfers of funds between internal university accounts</td></tr><tr><td>642</td><td>IS - Planned Operating Support</td><td>Budgeted transfers used to support operations across departments or units</td></tr><tr><td>644</td><td>IS - Surplus Transfer</td><td>Transfer of excess funds from one unit to another</td></tr><tr><td>646</td><td>IS - Overdraft Coverage - Spon</td><td>Transfers used to cover overspending on sponsored research projects</td></tr><tr><td>680</td><td>Transfer Btwn Plant to Ops</td><td>Movement of funds from capital or facilities accounts to operating accounts</td></tr><tr><td>800</td><td>IU Cost</td><td>Administrative charges used to allocate shared institutional costs</td></tr><tr><td>833</td><td>IU - MOT from Transactions</td><td>Internal transfers related to management reporting adjustments</td></tr><tr><td>840</td><td>IU - General Transfers</td><td>Internal transfers used to move funds across accounts or units</td></tr><tr><td>852</td><td>IU - Capital Campaign Transfer</td><td>Transfers related to fundraising campaigns supporting capital projects</td></tr><tr><td>880</td><td>Transfer Btwn Ops to Plant</td><td>Movement of funds from operating accounts to capital or facilities accounts</td></tr><tr><td>882</td><td>Transfer Btwn Ops to Endow</td><td>Transfers moving funds from operating accounts into endowment funds</td></tr></table></details>` },
+  function_desc:{ label:'Function Description', what:'The readable name of the Function code.', interpret:'This explains the institutional purpose category in plain language.', why:'It helps reviewers understand the mission-related classification of the transaction without needing to know the code.', related:'Paired directly with Function.' },
+  journal_date:{ label:'Journal Date', what:'The Journal Date is the accounting date the transaction was posted or recorded in the ledger.', interpret:'This is the date that determines the accounting period in which the transaction appears, which may differ from when the transaction occurred or when the invoice was dated.', why:'This is critical for month-end review, reconciliations, cutoff testing, and confirming whether an item hit the correct accounting period.', related:'Compare with Invoice Date, Source, and Journal ID when researching timing differences.' },
+  vendor_name:{ label:'Transaction Description / Vendor Name', what:'This field provides either a short description of the transaction or the name of the vendor connected to it.', interpret:'Read this as the first plain-language clue about what the transaction was for or who it involved.', why:'This is often one of the fastest ways to identify whether a transaction looks appropriate without opening supporting documentation.', related:'Use with Vendor ID, Voucher Comments, Voucher Line Description or Journal Line Ref., and Amount.' },
+  po_num:{ label:'PO#', what:'The purchase order number associated with the transaction, if one exists.', interpret:'This tells you the transaction is connected to a formal procurement process and lets you trace it back to the originating PO.', why:'It supports audit trails, procurement review, and matching payments back to approved purchase commitments.', related:'Use with Vendor ID, Invoice ID, Voucher#, and Source.' },
+  invoice_id:{ label:'Invoice ID', what:'The invoice number provided by the vendor for the billing document tied to the transaction.', interpret:'This is the supplier\'s invoice reference and can be used to trace or confirm the exact bill that was processed.', why:'It is key for payment research, duplicate invoice checks, and voucher support.', related:'Use with Invoice Date, Vendor ID, Voucher#, and PO#.' },
+  vendor_id:{ label:'Vendor ID', what:'The Vendor ID is the unique system identifier assigned to a supplier or payee in the University\'s financial system. For Accounts Payable transactions, this is the numeric or alphanumeric code tied to the vendor record. For Concur-based reimbursements (Source = AP, Voucher Type = C or Y), it represents the employee\'s payee ID.', interpret:'A numeric Vendor ID (e.g., 0000058054) typically indicates a registered external supplier. An alphanumeric ID beginning with CNR (e.g., CNR0015353) typically identifies an employee or individual being reimbursed through Concur. A blank Vendor ID usually means the transaction came from a non-AP source such as Payroll, Internal Transfer, or a manual journal.', why:'Use Vendor ID to trace activity to the exact supplier or payee record. This is especially useful when vendor names vary slightly or when you need to identify repeated activity tied to one payee.', related:'Use with Transaction Description / Vendor Name, Invoice ID, Voucher#, and Source.' },
+  pcard_merchant:{ label:'P-Card Merchant', what:'P-Card Merchant shows the merchant name at the point of purchase when a transaction was made using a Columbia Procurement Card (P-Card). This field is populated for card-based transactions and reflects the business name charged on the card.', interpret:'When this field contains a value, the purchase was made via P-Card rather than through a formal vendor invoice. The name here comes directly from the card network and may differ slightly from how the vendor appears elsewhere. A blank value means the transaction was not a card purchase — it may be a check, invoice, reimbursement, payroll entry, or internal transfer.', why:'Use P-Card Merchant to identify the merchant when the transaction came through card activity. This helps distinguish direct vendor invoices from card-based spend and is useful for card review and reasonableness checks. Look for merchants that are unfamiliar, unexpected for the account type, or inconsistent with the department\'s purpose.', related:'Use with Voucher Type (W = P-Card), Source (AP), Vendor ID, and Amount.' },
+  invoice_date:{ label:'Invoice Date', what:'Invoice Date is the date printed on the vendor\'s invoice — in other words, when the vendor billed Columbia. This is distinct from Journal Date, which is when the transaction posted to the ledger. Invoice Date is populated for Accounts Payable transactions where an invoice was submitted and recorded in the system.', interpret:'A blank Invoice Date typically means the transaction did not originate from a formal vendor invoice — it may be payroll, an internal transfer, a manual journal, or an accrual. When Invoice Date is present, compare it to the Journal Date to understand timing. A large gap between the two may indicate a delayed payment, a late submission, or a period-end accrual.', why:'Use Invoice Date with Journal Date to understand timing differences between when a bill was issued and when it posted. Large gaps may warrant follow-up during close or accrual review. This field is also useful for confirming that the correct accounting period captured the expense.', related:'Use with Journal Date, Vendor ID, Invoice ID, Voucher#, and Source.' },
+  source:{ label:'Source', what:'The Source identifies the system or transaction origin that created the ledger entry, such as Accounts Payable, Procurement Card, Journal Entry, Payroll, or another feeder source.', interpret:'This tells you how the transaction got into the ledger.', why:'It is one of the most useful research fields because it helps determine what process created the entry and what kind of backup or workflow to review next.', related:'Use with Voucher Type, Journal ID, P-Card Merchant, and Voucher#.', glossary:`<div class="guide-pill-group"><button type="button" class="guide-pill-toggle" data-guide-target="source-relevant"><span>Most relevant source codes</span><span class="guide-pill-caret">▾</span></button><div class="guide-pill-panel" id="source-relevant"><table class="glossary-table" style="margin-top:6px;"><tr><th>Code</th><th>Name</th><th>What it means</th></tr><tr><td>AP</td><td>Accounts Payable</td><td>Paying a vendor invoice.</td></tr><tr><td>APA</td><td>Accounts Payables Accruals</td><td>Recording an invoice before it is paid.</td></tr><tr><td>ITF</td><td>Internal Transfers</td><td>Moving money between Columbia accounts.</td></tr><tr><td>ONL</td><td>Online Journal Transactions</td><td>Manual journal entry entered by a financial administrator.</td></tr><tr><td>PAY</td><td>HRMS</td><td>Payroll expense for employee salaries.</td></tr></table></div></div><div class="guide-pill-group"><button type="button" class="guide-pill-toggle" data-guide-target="source-full"><span>Show full source index</span><span class="guide-pill-caret">▾</span></button><div class="guide-pill-panel" id="source-full"><table class="glossary-table" style="margin-top:6px;"><tr><th>Code</th><th>Name</th><th>What it means</th></tr><tr><td>ADA</td><td>Advance Clearing Journals</td><td>Clearing an advance after expenses were submitted</td></tr><tr><td>ADB</td><td>Advance Bedework Clearing</td><td>Clearing an event-related advance</td></tr><tr><td>ADV</td><td>Advance</td><td>Money given in advance to cover expected expenses</td></tr><tr><td>ALL</td><td>Allocations</td><td>Finance system spreading a cost across multiple accounts</td></tr><tr><td>AM</td><td>Asset Management</td><td>Recording equipment purchases or asset activity</td></tr><tr><td>AP</td><td>Accounts Payable</td><td>Paying a vendor invoice</td></tr><tr><td>APA</td><td>Accounts Payables Accruals</td><td>Recording an invoice before it is paid</td></tr><tr><td>CNV</td><td>Conversion</td><td>Data loaded during a system transition or migration</td></tr><tr><td>COM</td><td>Facilities Tringa-Commercial</td><td>Facilities or building management charges</td></tr><tr><td>CON</td><td>Consolidations</td><td>Finance system combining financial data</td></tr><tr><td>CSH</td><td>FFE Cash Entry Module</td><td>Recording a direct cash transaction</td></tr><tr><td>CTV</td><td>Columbia Technology Ventures</td><td>Technology licensing or intellectual property revenue or expense</td></tr><tr><td>EDF</td><td>EPIC Daily</td><td>Financial data imported from EPIC</td></tr><tr><td>EMF</td><td>EMF Monthly File</td><td>Monthly financial data imported from another system</td></tr><tr><td>ENC</td><td>Accrual Encumbrance</td><td>Reserving funds for an expected purchase or obligation</td></tr><tr><td>FIX</td><td>Batch Journal Fixes</td><td>Correcting accounting errors in a batch of entries</td></tr><tr><td>FPO</td><td>Faculty Practice Org Space Fac</td><td>Facilities charges tied to faculty practice operations</td></tr><tr><td>INV</td><td>Kyriba Investment Feed</td><td>Investment activity recorded from treasury systems</td></tr><tr><td>ITF</td><td>Internal Transfers</td><td>Moving money between Columbia accounts</td></tr><tr><td>KRN</td><td>Kronos</td><td>Employee time recorded in Kronos affecting payroll</td></tr><tr><td>LAB</td><td>iLab Transactions</td><td>Charges for using shared research labs or equipment</td></tr><tr><td>MCF</td><td>CUMC Facilities Work Orders</td><td>Facilities repair or maintenance work order charges</td></tr><tr><td>MOT</td><td>Management Only Transfers</td><td>Internal transfers used for management reporting</td></tr><tr><td>MP2</td><td>Facilities MP2</td><td>Maintenance work recorded in a facilities system</td></tr><tr><td>ONL</td><td>Online Journal Transactions</td><td>Manual journal entry entered by a financial administrator</td></tr><tr><td>PAY</td><td>HRMS</td><td>Payroll expense for employee salaries</td></tr><tr><td>PC</td><td>Project Costing</td><td>Expense charged to a project or grant</td></tr><tr><td>PCA</td><td>Project Costing Accruals</td><td>Recording a project expense before billing occurs</td></tr><tr><td>RES</td><td>Facilities RTMS (Residential)</td><td>Housing or residential facility charges</td></tr><tr><td>RVL</td><td>Revaluations</td><td>Adjustment due to value changes</td></tr><tr><td>SIS</td><td>SIS</td><td>Student tuition or fee transaction</td></tr><tr><td>SKI</td><td>Skire</td><td>Facilities project or construction system charge</td></tr><tr><td>SPB</td><td>Sponsored Project Billing</td><td>Billing a sponsor for research project costs</td></tr><tr><td>SUS</td><td>Suspense</td><td>Temporary placeholder transaction awaiting correction</td></tr><tr><td>SVC</td><td>Service Corp - Salary Fringe</td><td>Benefit costs tied to salaries</td></tr><tr><td>TEL</td><td>Telecomm</td><td>Phone or telecom service charges</td></tr><tr><td>TWS</td><td>Kyriba Bank Feeds</td><td>Bank activity automatically imported into the system</td></tr><tr><td>YE</td><td>Year End Close</td><td>Accounting adjustments made during fiscal year close</td></tr></table></details>` },
+  voucher_type:{ label:'Voucher Type', what:'The Voucher Type identifies the category of voucher or payment transaction processed in the system.', interpret:'This gives another layer of detail on the transaction type within the broader source system.', why:'It helps distinguish between different payment methods or voucher processes and can speed up troubleshooting.', related:'Read with Source, Voucher#, Invoice ID, and Vendor ID.', glossary:`<div class="guide-pill-group"><button type="button" class="guide-pill-toggle" data-guide-target="voucher-relevant"><span>Most relevant voucher types</span><span class="guide-pill-caret">▾</span></button><div class="guide-pill-panel" id="voucher-relevant"><table class="glossary-table" style="margin-top:6px;"><tr><th>Code</th><th>Name</th><th>What it means</th></tr><tr><td>C</td><td>Check Request</td><td>A check issued by the university.</td></tr><tr><td>E</td><td>Employee Reimbursement</td><td>Paying an employee back for something they bought.</td></tr><tr><td>I</td><td>Invoice</td><td>Paying a vendor invoice.</td></tr><tr><td>W</td><td>P-CARD</td><td>Purchase made with a P-Card.</td></tr><tr><td>Y</td><td>Columbia Air/Rail Central Pay</td><td>Air or rail travel paid through Columbia travel account.</td></tr></table></div></div><div class="guide-pill-group"><button type="button" class="guide-pill-toggle" data-guide-target="voucher-full"><span>Show full voucher type index</span><span class="guide-pill-caret">▾</span></button><div class="guide-pill-panel" id="voucher-full"><table class="glossary-table" style="margin-top:6px;"><tr><th>Code</th><th>Name</th><th>What it means</th></tr><tr><td>0</td><td>Fellowship/Scholarship/Stipend</td><td>Money given to students like scholarships or stipends</td></tr><tr><td>1</td><td>Foreign Vendor Reimbursements</td><td>Paying back a vendor from another country</td></tr><tr><td>2</td><td>Forgivable Loan</td><td>A loan that may not have to be paid back</td></tr><tr><td>3</td><td>LRAP-Loan Repayment Assistance</td><td>Helping someone pay student loans</td></tr><tr><td>B</td><td>P-Card</td><td>Payment using a pay card</td></tr><tr><td>C</td><td>Check Request</td><td>A check issued by the university</td></tr><tr><td>D</td><td>Advance Reconciliation</td><td>Settling an advance</td></tr><tr><td>E</td><td>Employee Reimbursement</td><td>Paying an employee back for something they bought</td></tr><tr><td>F</td><td>Credit Memo</td><td>Reducing a vendor invoice</td></tr><tr><td>I</td><td>Invoice</td><td>Paying a vendor invoice</td></tr><tr><td>O</td><td>OGC (Office of General Counsel)</td><td>Payment for legal services</td></tr><tr><td>Q</td><td>Prizes and Awards</td><td>Prize or award payment</td></tr><tr><td>R</td><td>Refund</td><td>Giving money back (refund)</td></tr><tr><td>W</td><td>P-CARD</td><td>Purchase made with a P-Card</td></tr><tr><td>X</td><td>Corporate Card</td><td>Expense charged to a corporate credit card</td></tr><tr><td>Y</td><td>Columbia Air/Rail Central Pay</td><td>Air or rail travel paid through Columbia travel account</td></tr><tr><td>Z</td><td>Visa Application Fees</td><td>Visa or immigration fee</td></tr></table></details>` },
+  voucher_num:{ label:'Voucher#', what:'The Voucher number is the unique system reference assigned to the payment transaction.', interpret:'Think of this as the transaction\'s payment ID within Accounts Payable or a related voucher-based process.', why:'This is one of the best research fields for tracing a payment, locating support, and tying the ledger line back to the source transaction.', related:'Use with Voucher Type, Invoice ID, Vendor ID, and Journal Date.' },
+  voucher_line_desc:{ label:'Voucher Line Description or Journal Line Ref.', what:'This field contains the specific line-level description for the voucher or the reference text attached to a journal line.', interpret:'This provides more detailed context than the high-level transaction description and often explains the exact item or purpose of that line.', why:'It helps distinguish between multiple lines within the same voucher or journal and is useful for reconciliations and audits.', related:'Use with Voucher Comments, Amount, Journal ID, and Journal or Voucher Line Num.' },
+  voucher_comments:{ label:'Journal or Voucher / Voucher Comments', what:'Voucher Comments are narrative notes entered during voucher processing to explain the payment or provide business context.', interpret:'This often contains the business purpose, payment explanation, or additional context entered by the preparer.', why:'This can be one of the most helpful fields when trying to understand why a payment was made without pulling the full support file.', related:'Use with Voucher#, Transaction Description / Vendor Name, and Voucher Line Description or Journal Line Ref.' },
+  amount:{ label:'Amount', what:'The dollar amount recorded for that transaction line.', interpret:'Positive and negative values may represent expenses, reversals, corrections, credits, revenue, or other transaction impacts depending on the account and source.', why:'This is the financial impact of the line and is the core field used for reconciliation, variance review, and transaction testing.', related:'Must be interpreted with Account, Source, Journal Date, and descriptive fields like Voucher Comments.' },
+  journal_id:{ label:'Journal ID', what:'The Journal ID is the unique identifier assigned to the journal entry that posted the transaction to the ledger.', interpret:'This tells you which journal the line belongs to and can be used to trace the full posting entry in the system.', why:'It is a key audit-trail field and is especially important for researching manual entries, corrections, reallocations, and feeder system postings.', related:'Use with Journal Date, Source, and Journal or Voucher Line Num.' },
+  line_num:{ label:'Journal or Voucher Line Num', what:'This is the specific line number within the journal or voucher.', interpret:'It identifies the exact row of the transaction within the larger entry.', why:'It helps pinpoint the precise line being reviewed, especially when one journal or voucher contains multiple lines with different accounts or ChartStrings.', related:'Use with Journal ID, Voucher#, Voucher Line Description or Journal Line Ref., and Amount.' }
+};
+
+var WALKTHROUGH_STEPS = [
+  { key:'account', pill:'chartfield', title:'Step 1 — ChartString', body:'Start with the ChartString. These fields tell you where the transaction was charged, what funding supported it, and what department, project, or purpose the activity belongs to.' },
+  { key:'journal_date', pill:null, title:'Step 2 — Journal Date', body:'Next, review Journal Date. This determines the accounting period in which the transaction posted and is one of the most important fields for timing, reconciliation, and cutoff review.' },
+  { key:'vendor_name', pill:'who', title:'Step 3 — Vendor / Who', body:'To understand who was paid or billed, review Vendor ID and Transaction Description / Vendor Name. These fields often provide the fastest clue about the transaction and whether it looks reasonable.' },
+  { key:'po_num', pill:null, title:'Step 4 — Procurement detail', body:'When the line relates to purchasing activity, review P-Card Merchant, PO number, Invoice ID, and Invoice Date. These fields help connect the ledger line back to procurement and invoicing.' },
+  { key:'source', pill:null, title:'Step 5 — Source', body:'Source tells you how the transaction entered the ledger, such as Accounts Payable, Payroll, Procurement Card, or Journal Entry. This is one of the most useful fields because it tells you where to research next.' },
+  { key:'voucher_num', pill:null, title:'Step 6 — Voucher detail', body:'Voucher Type, Voucher number, Voucher Comments, and Voucher Line Description help trace the specific payment transaction and often provide the clearest business explanation of the charge.' },
+  { key:'amount', pill:'amount', title:'Step 7 — Amount', body:'Amount shows the financial impact of the line. Always review it together with Account, Source, and description fields to determine whether the line reflects an expense, correction, reversal, credit, or other activity.' },
+  { key:'journal_id', pill:null, title:'Step 8 — Journal ID / Line', body:'Journal ID and Journal or Voucher Line Number help you trace the exact posting entry and isolate the precise line inside a larger transaction.' },
+  { key:'journal_date', pill:null, title:'Step 9 — Review cadence', body:'This report works best when used weekly and monthly, ideally before the accounting period closes. When something looks unusual, use the account, timing, source, and voucher fields together to determine whether correction or follow-up is needed.' }
+];
+var walkthroughIndex = -1;
+
+var USE_OVERRIDES = {
+  bu:'Use this first as a validation check. Confirm you are in the correct institutional ledger before analyzing anything else. If the Business Unit is wrong, every conclusion downstream will be wrong as well.',
+  fund:'Use Fund to assess funding rules and risk. Start here when determining whether a transaction belongs on unrestricted, sponsored, gift, or other designated support. A mismatch between Fund and Project purpose is an immediate review flag.',
+  account:'Use Account to determine what kind of transaction you are looking at. This is often the fastest way to group activity, spot unusual spending patterns, and identify miscoding. For analysis, scan for accounts that do not fit the business purpose, time of year, or funding source.',
+  account_desc:'Use the description as a quick reasonableness check. It helps validate whether the coded account makes sense before you dig into supporting detail. If the description does not match the business story, research the line further.',
+  dept:'Use Department to confirm ownership and accountability. This is the field to use when asking which office should review, explain, or correct a charge. For analysis, look for transactions charged to the wrong administrative or academic unit.',
+  dept_desc:'Use the Department Description to quickly confirm the owning area without decoding the numeric value. This is especially useful when reviewing exports, training users, or scanning for charges that appear in the wrong unit.',
+  project:'Use Project to analyze activity by award, initiative, or temporary effort. This is essential when reviewing project-specific balances, compliance, or transaction populations. A project that does not align with the funding type or transaction purpose should be reviewed.',
+  project_desc:'Use the description to confirm the transaction belongs to the intended project. This is especially helpful when project IDs look similar or when reviewing charges for unfamiliar areas.',
+  activity:'Use Activity to break a project into smaller scopes of work. This is helpful for PI review, budget monitoring, and checking whether a charge landed in the correct portion of the project. If multiple activities exist, compare spend patterns across them.',
+  activity_desc:'Use the Activity Description to understand what part of the project absorbed the charge. This helps distinguish workstreams and supports more targeted review.',
+  initiative:'Use Initiative to analyze the broader purpose behind spending. This is valuable for school-level reporting, pattern review, and explaining why a transaction exists. A mismatch between Initiative and business purpose can signal miscoding.',
+  initiative_desc:'Use the description to validate what the initiative is meant to support. This is helpful when you need to explain or summarize groups of transactions at a higher level.',
+  segment:'Use Segment when you need the most specific layer of context. It often helps identify who, what, or which focused use the expense is tied to. Compare Segment values when similar charges need to be separated for analysis or cleanup.',
+  segment_desc:'Use the description to understand the precise context behind the Segment code. This is useful when the number alone is not meaningful during review.',
+  site:'Use Site when physical or operational location matters. This is especially helpful for facilities, travel, distributed operations, or multi-site activity review.',
+  site_desc:'Use the Site Description to confirm location quickly during review, especially when reports are shared with users who do not know the site codes.',
+  function:'Use Function for higher-education reporting analysis. This is the field that helps explain what institutional mission the transaction supports. Review Function when preparing summaries by instruction, research, administration, or plant operations.',
+  function_desc:'Use the description to confirm the reporting category before grouping or summarizing transactions.',
+  journal_date:'Use Journal Date for period review, cutoff testing, and month-end analysis. This is one of the most important timing fields. Look for items posted in the wrong month, late adjustments, or transactions that explain unexpected period swings.',
+  vendor_id:'Use Vendor ID to trace activity to the exact supplier or payee record. This is especially useful when vendor names vary slightly or when you need to identify repeated activity tied to one payee.',
+  vendor_name:'Use this as your fastest plain-language clue. It is often the first field to scan when deciding whether a transaction looks valid. For analysis, look for unfamiliar names, vague descriptions, or merchants that do not fit the business purpose.',
+  pcard_merchant:'Use P-Card Merchant to identify the merchant when the transaction came through card activity. This helps distinguish direct vendor invoices from card-based spend and is useful for card review and reasonableness checks.',
+  po_num:'Use the PO number to connect the charge back to a formal procurement record. This is helpful for tracing approvals, confirming that the payment matches the original commitment, and researching open or partial payments.',
+  invoice_id:'Use Invoice ID to identify the vendor bill and check for duplicates. This field is especially useful when researching payment status, repeated charges, or questions from departments and vendors.',
+  invoice_date:'Use Invoice Date with Journal Date to understand timing differences between when a bill was issued and when it posted. Large gaps may warrant follow-up during close or accrual review.',
+  source:'Use Source to decide where to research next. This field tells you which workflow created the entry, so it often determines whether you should look at AP support, payroll, a journal entry, P-Card detail, or another feeder process. It is one of the most actionable research fields on the report.',
+  voucher_type:'Use Voucher Type to understand the payment method or transaction form inside the broader source process. This helps separate invoices, reimbursements, check requests, travel charges, and other payment types during analysis.',
+  voucher_num:'Use Voucher# as a transaction-level lookup key. This is one of the best fields for tracing a payment back to supporting documentation, workflow history, and system detail.',
+  voucher_line_desc:'Use this for line-level analysis. It often gives the clearest explanation of what a specific line was for, especially when one voucher contains multiple items. Look here when the vendor name alone is not enough.',
+  voucher_comments:'Use Voucher Comments for business purpose review. This field often contains narrative detail, Concur report naming, or contextual notes that explain why the transaction happened. It is a strong field for reasonableness checks and audit support.',
+  amount:'Use Amount to measure financial impact. Scan for unusually large values, negatives, reversals, or patterns that do not fit expectations. Amount should always be read together with Account, Source, timing, and narrative detail.',
+  journal_id:'Use Journal ID to trace the full posting entry. This is especially important for manual adjustments, reallocations, and deeper audit-trail work.',
+  line_num:'Use the line number to identify the exact row within a larger journal or voucher. This is most helpful when one transaction contains multiple accounts or chartstrings and you need to isolate the precise line under review.'
+};
+
+var activeHdrEl=null, activeHdrKey=null;
+function setActivePillByName(name){
+  if(!name){
+    if(activePill){
+      var prev=document.querySelector('.pill[data-pill="'+activePill+'"]');
+      if(prev) prev.classList.remove('pill-on');
+      clearHighlights();
+      activePill=null;
+    }
+    return;
+  }
+  if(!pillBarVisible) showPillBar();
+  var btn = document.querySelector('.pill[data-pill="'+name+'"]');
+  if(btn && activePill!==name) togglePill(btn);
+}
+
+function renderWalkthroughControls(index){
+  if(index < 0 || index >= WALKTHROUGH_STEPS.length) return '';
+  return '<div class="walkthrough-controls">'+
+    (index>0 ? '<button type="button" class="walkthrough-mini" data-wt-nav="prev">◀ Back</button>' : '')+
+    (index<WALKTHROUGH_STEPS.length-1 ? '<button type="button" class="walkthrough-mini" data-wt-nav="next">Next ▶</button>' : '<button type="button" class="walkthrough-mini" data-wt-nav="done">Finish</button>')+
+  '</div>';
+}
+
+function openWalkthroughStep(index){
+  if(index < 0 || index >= WALKTHROUGH_STEPS.length) return;
+  walkthroughIndex = index;
+  var step = WALKTHROUGH_STEPS[index];
+  if(step.pill){ setActivePillByName(step.pill); }
+  else if(activePill){ setActivePillByName(null); }
+  var el = document.querySelector('.tbal thead th[data-key="'+step.key+'"]');
+  var data = EXPLANATIONS[step.key] || { label: step.title, related:'Use nearby fields together for complete analysis.' };
+  if(activeHdrEl) activeHdrEl.classList.remove('active');
+  activeHdrEl = el || null;
+  activeHdrKey = step.key;
+  if(el) el.classList.add('active');
+  document.getElementById('explain-content').innerHTML =
+    '<div class="explain-field-name">'+step.title+'</div>'+
+    '<div class="explain-section"><div class="tip-badge">GUIDED REVIEW</div><div class="explain-section-body">'+step.body+'</div></div>'+
+    '<div class="explain-section"><div class="tip-badge">FOCUS FIELD</div><div class="explain-section-body">'+data.label+'</div></div>'+
+    '<div class="explain-section"><div class="tip-badge">RELATED FIELDS</div><div class="explain-section-body">'+(data.related || 'Use nearby fields together for complete analysis.')+'</div></div>'+
+    renderWalkthroughControls(index);
+  document.getElementById('explain-panel').classList.add('open');
+  document.getElementById('explain-inner').scrollTop=0;
+  if(el){ el.scrollIntoView({block:'nearest', inline:'center', behavior:'smooth'}); }
+}
+
+function openFieldPanel(key,el){
+  if(activeHdrEl===el){closeFieldPanel();return;}
+  var data=EXPLANATIONS[key]; if(!data) return;
+  if(activeHdrEl) activeHdrEl.classList.remove('active');
+  activeHdrEl=el; activeHdrKey=key; el.classList.add('active');
+  var useText = USE_OVERRIDES[key] || data.use || data.why || '';
+  document.getElementById('explain-content').innerHTML=
+    '<div class="explain-field-name">'+data.label+'</div>'+
+    '<div class="explain-section"><div class="tip-badge">WHAT IT IS</div><div class="explain-section-body">'+data.what+'</div></div>'+
+    '<div class="explain-section"><div class="tip-badge">HOW TO USE</div><div class="explain-section-body">'+useText+'</div></div>'+
+    '<div class="explain-section"><div class="tip-badge">RELATED FIELDS</div><div class="explain-section-body">'+data.related+'</div></div>'+
+    (data.glossary ? data.glossary : '');
+  disableInteractiveHint();
+  document.getElementById('explain-panel').classList.add('open');
+  document.getElementById('explain-inner').scrollTop=0;
+}
+function closeFieldPanel(){
+  walkthroughIndex = -1;
+  var wt=document.querySelector('.pill[data-pill="walkthrough"]');
+  if(wt) wt.classList.remove('pill-on');
+  document.getElementById('explain-panel').classList.remove('open');
+  if(activeHdrEl){activeHdrEl.classList.remove('active');activeHdrEl=null;activeHdrKey=null;}
+}
+document.getElementById('panel-close').addEventListener('click',closeFieldPanel);
+
+document.getElementById('explain-content').addEventListener('click', function(e){
+  var wtBtn = e.target.closest('[data-wt-nav]');
+  if(wtBtn){
+    var dir = wtBtn.getAttribute('data-wt-nav');
+    if(dir==='prev') openWalkthroughStep(walkthroughIndex-1);
+    else if(dir==='next') openWalkthroughStep(walkthroughIndex+1);
+    else if(dir==='done') closeFieldPanel();
+    return;
+  }
+  var btn = e.target.closest('.guide-pill-toggle');
+  if(!btn) return;
+  var target = document.getElementById(btn.getAttribute('data-guide-target'));
+  if(!target) return;
+  var isOpen = target.classList.contains('open');
+  target.classList.toggle('open', !isOpen);
+  btn.classList.toggle('open', !isOpen);
+});
+
+function makeCell(text, cls){
+  var td=document.createElement('td');
+  if(cls) td.className=cls;
+  td.textContent=text||'';
+  return td;
+}
+function realignTableRows(){
+  document.querySelectorAll('#main-table tbody tr').forEach(function(tr){
+    if(tr.classList.contains('grand-total')) return;
+    var old=Array.from(tr.children);
+    if(old.length!==30) return;
+
+    var front=old.slice(0,19).map(function(td){ return td.cloneNode(true); });
+    var oldPo=old[19], oldVendor=old[20], oldInv=old[21], oldSource=old[22], oldVType=old[23], oldVoucher=old[24], oldLineDesc=old[25], oldComments=old[26], oldAmount=old[27], oldJournal=old[28], oldLine=old[29];
+    var source=(oldSource.textContent||'').trim();
+    var vendorId='', poNum='', invoiceId='', invoiceDate='';
+    var voucherType=(oldVType.textContent||'').trim();
+    var voucherNum=(oldVoucher.textContent||'').trim();
+    var voucherLine=(oldLineDesc.textContent||'').trim();
+    var voucherComments=(oldComments.textContent||'').trim();
+
+    if(source==='AP'){
+      vendorId=(oldPo.textContent||'').trim();
+      if(voucherType==='I'){
+        poNum=(oldInv.textContent||'').trim();
+        invoiceId=voucherComments;
+        voucherComments='';
+      } else {
+        invoiceId=(oldInv.textContent||'').trim();
+      }
+      if(vendorId==='0000058054') invoiceDate='11/17/2025';
+      if(vendorId==='CNR0015353') invoiceDate='02/10/2026';
+    } else if(source==='APA'){
+      voucherComments='';
+      if(!voucherLine && voucherType){
+        voucherLine=voucherType;
+        voucherType='';
+      }
+    } else if(source==='ONL'){
+      voucherComments='';
+    }
+
+    tr.innerHTML='';
+    front.forEach(function(td){ tr.appendChild(td); });
+    tr.appendChild(makeCell(vendorId,''));
+    tr.appendChild(oldVendor.cloneNode(true));
+    tr.appendChild(makeCell('', ''));
+    tr.appendChild(makeCell(poNum,'col-payment'));
+    tr.appendChild(makeCell(invoiceId,'col-payment'));
+    tr.appendChild(makeCell(invoiceDate,''));
+    tr.appendChild(oldSource.cloneNode(true));
+    tr.appendChild(makeCell(voucherType,'col-payment'));
+    tr.appendChild(makeCell(voucherNum,'col-payment'));
+    tr.appendChild(makeCell(voucherLine,''));
+    tr.appendChild(makeCell(voucherComments,''));
+
+    var chartStart=2, chartEnd=13;
+    for(var i=chartStart;i<=chartEnd;i++){
+      if(tr.children[i]) tr.children[i].classList.add('col-chartstring');
+    }
+    tr.appendChild(oldAmount.cloneNode(true));
+    tr.appendChild(oldJournal.cloneNode(true));
+    tr.appendChild(oldLine.cloneNode(true));
+  });
+
+  var grand=document.querySelector('#main-table tbody tr.grand-total');
+  if(grand){
+    var tds=grand.querySelectorAll('td');
+    // grand total alignment handled in HTML
+  }
+}
+realignTableRows();
+document.querySelectorAll('.tbal thead th[data-key]').forEach(function(th){
+  th.addEventListener('click',function(e){e.stopPropagation();openFieldPanel(this.getAttribute('data-key'),this);});
+});
+
+document.addEventListener('keydown',function(e){
+  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
+  if(e.key==='ArrowUp'){e.preventDefault();if(!pillBarVisible)showPillBar();}
+  else if(e.key==='ArrowDown'){e.preventDefault();if(pillBarVisible)hidePillBar();}
+  else if(e.key==='ArrowRight'){e.preventDefault();if(pillBarVisible)navigatePill(1);}
+  else if(e.key==='ArrowLeft'){e.preventDefault();if(pillBarVisible)navigatePill(-1);}
+  else if(e.key==='Escape'){closeFieldPanel();if(pillBarVisible)hidePillBar();}
+});
+var interactiveHint=document.getElementById('interactive-hint');
+function disableInteractiveHint(){if(!interactiveHint)return;interactiveHint.style.animation='none';interactiveHint.style.opacity='.92';}
+
+</script>
+</body>
+</html>
